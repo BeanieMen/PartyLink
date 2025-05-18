@@ -190,7 +190,6 @@ const DashboardScreen: React.FC = () => {
         const resp = await fetch(`${API_BASE_URL}/party`);
         if (!resp.ok) throw new Error(`Status ${resp.status}`);
         const data: PartyRow[] = await resp.json()
-        console.log(data)
         setParties(data);
         await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
       } catch (err: any) {
@@ -224,7 +223,6 @@ const DashboardScreen: React.FC = () => {
   const filteredParties = parties.filter((p) => {
     const searchLower = filters.search.toLowerCase();
     const nameMatch = p.name.toLowerCase().includes(searchLower);
-    // TODO: Implement date filtering logic based on filters.date
     return nameMatch;
   });
 
