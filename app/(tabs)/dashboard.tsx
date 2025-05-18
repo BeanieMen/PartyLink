@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -6,16 +6,15 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
-
   ActivityIndicator,
   FlatList,
   Dimensions,
   Platform,
   Alert,
   ScrollView,
-} from "react-native";
-import { useRouter, Link, Stack } from "expo-router";
-import { useAuth } from "@clerk/clerk-expo";
+} from 'react-native'
+import { useRouter, Link, Stack } from 'expo-router'
+import { useAuth } from '@clerk/clerk-expo'
 import {
   Search,
   MessageSquare,
@@ -25,42 +24,34 @@ import {
   Calendar as CalendarIcon,
   Ticket,
   PartyPopper,
-} from "lucide-react-native";
-import { LinearGradient } from "expo-linear-gradient";
+} from 'lucide-react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withRepeat,
   Easing,
-} from "react-native-reanimated";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+} from 'react-native-reanimated'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import Colors, { API_BASE_URL } from "@/constants";
-import { PartyRow } from "@/types/database";
+import Colors, { API_BASE_URL } from '@/constants'
+import { PartyRow } from '@/types/database'
 
-const AppColors = Colors.dark;
+const AppColors = Colors.dark
 
-const { width: screenWidth } = Dimensions.get("window");
-
-const placeholderImage = (width: number, height: number, text = "Image") =>
-  `https://placehold.co/${width}x${height}/${AppColors.cardBg.replace("#", "")}/${AppColors.white.replace("#", "")}?text=${encodeURIComponent(text)}&font=Inter`;
-
+const { width: screenWidth } = Dimensions.get('window')
 
 const SearchFilters: React.FC<{
-  filters: { date: string; search: string };
-  setFilters: React.Dispatch<React.SetStateAction<{ date: string; search: string }>>;
+  filters: { date: string; search: string }
+  setFilters: React.Dispatch<React.SetStateAction<{ date: string; search: string }>>
 }> = ({ filters, setFilters }) => {
-  const filterDateOptions = ["Any Date", "Today", "This Weekend", "Next Week", "This Month"];
+  const filterDateOptions = ['Any Date', 'Today', 'This Weekend', 'Next Week', 'This Month']
 
   return (
     <View style={styles.searchFiltersContainer}>
       <View style={styles.searchInputContainer}>
-        <Search
-          size={18}
-          color={AppColors.gray400}
-          style={styles.searchIcon}
-        />
+        <Search size={18} color={AppColors.gray400} style={styles.searchIcon} />
         <TextInput
           placeholder="Search for parties..."
           placeholderTextColor={AppColors.gray400}
@@ -69,7 +60,11 @@ const SearchFilters: React.FC<{
           style={styles.searchInput}
         />
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateFilterScrollView}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.dateFilterScrollView}
+      >
         {filterDateOptions.map((option) => (
           <TouchableOpacity
             key={option}
@@ -79,166 +74,188 @@ const SearchFilters: React.FC<{
             ]}
             onPress={() => setFilters({ ...filters, date: option })}
           >
-            <Text style={[
-              styles.dateFilterButtonText,
-              filters.date === option && styles.dateFilterButtonTextActive,
-            ]}>{option}</Text>
+            <Text
+              style={[
+                styles.dateFilterButtonText,
+                filters.date === option && styles.dateFilterButtonTextActive,
+              ]}
+            >
+              {option}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
     </View>
-  );
-};
-
+  )
+}
 
 const PartyCard: React.FC<{ party: PartyRow }> = ({ party }) => {
   return (
     <View style={styles.partyCardContainer}>
       <Image
         source={{ uri: `${API_BASE_URL}/party/${party.party_id}/banner` }}
-        defaultSource={{ uri: placeholderImage(400, 160, party.name) }}
         style={styles.partyCardImage}
       />
       <View style={styles.partyCardContent}>
-        <Text style={styles.partyCardName} numberOfLines={2}>{party.name}</Text>
+        <Text style={styles.partyCardName} numberOfLines={2}>
+          {party.name}
+        </Text>
         <View style={styles.partyCardRow}>
           <CalendarIcon size={14} color={AppColors.gray300} style={styles.partyCardIcon} />
           <Text style={styles.partyCardText}>{party.party_date}</Text>
           {party.tickets_left > 0 ? (
-            <View style={[styles.ticketBadge, { backgroundColor: AppColors.green400 + '30', marginLeft: 'auto' }]}>
+            <View
+              style={[
+                styles.ticketBadge,
+                { backgroundColor: AppColors.green400 + '30', marginLeft: 'auto' },
+              ]}
+            >
               <Text style={[styles.ticketBadgeText, { color: AppColors.green400 }]}>
                 {party.tickets_left} spots left
               </Text>
             </View>
           ) : (
-            <View style={[styles.ticketBadge, { backgroundColor: AppColors.red400 + '30', marginLeft: 'auto' }]}>
-              <Text style={[styles.ticketBadgeText, { color: AppColors.red400 }]}>
-                Sold out
-              </Text>
+            <View
+              style={[
+                styles.ticketBadge,
+                { backgroundColor: AppColors.red400 + '30', marginLeft: 'auto' },
+              ]}
+            >
+              <Text style={[styles.ticketBadgeText, { color: AppColors.red400 }]}>Sold out</Text>
             </View>
           )}
         </View>
         <View style={styles.partyCardRow}>
           <MapPin size={14} color={AppColors.gray300} style={styles.partyCardIcon} />
-          <Text style={styles.partyCardText} numberOfLines={1}>{party.location}</Text>
+          <Text style={styles.partyCardText} numberOfLines={1}>
+            {party.location}
+          </Text>
         </View>
       </View>
-      <Link href={{ pathname: "/party/[id]", params: { id: party.party_id } }} asChild>
+      <Link href={{ pathname: '/party/[id]', params: { id: party.party_id } }} asChild>
         <TouchableOpacity style={styles.partyCardButton}>
           <Text style={styles.partyCardButtonText}>View Details</Text>
         </TouchableOpacity>
       </Link>
     </View>
-  );
-};
-
-
+  )
+}
 
 const DashboardScreen: React.FC = () => {
-  const { isLoaded, isSignedIn, signOut } = useAuth();
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"explore" | "attending">("explore");
-  const [filters, setFilters] = useState({ search: "", date: "Any Date" });
-  const [parties, setParties] = useState<PartyRow[]>([]);
-  const [contentLoading, setContentLoading] = useState(true);
-  const [initialAppLoading, setInitialAppLoading] = useState(true);
+  const { isLoaded, isSignedIn, signOut } = useAuth()
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'explore' | 'attending'>('explore')
+  const [filters, setFilters] = useState({ search: '', date: 'Any Date' })
+  const [parties, setParties] = useState<PartyRow[]>([])
+  const [contentLoading, setContentLoading] = useState(true)
+  const [initialAppLoading, setInitialAppLoading] = useState(true)
 
-  const loaderScale = useSharedValue(1);
-  const loaderOpacity = useSharedValue(0.7);
+  const loaderScale = useSharedValue(1)
+  const loaderOpacity = useSharedValue(0.7)
 
   useEffect(() => {
     if (initialAppLoading) {
-      loaderScale.value = withRepeat(withTiming(1.2, { duration: 750, easing: Easing.inOut(Easing.ease) }), -1, true);
-      loaderOpacity.value = withRepeat(withTiming(1, { duration: 750, easing: Easing.inOut(Easing.ease) }), -1, true);
+      loaderScale.value = withRepeat(
+        withTiming(1.2, { duration: 750, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true,
+      )
+      loaderOpacity.value = withRepeat(
+        withTiming(1, { duration: 750, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true,
+      )
     } else {
-      loaderScale.value = withTiming(1);
-      loaderOpacity.value = withTiming(1);
+      loaderScale.value = withTiming(1)
+      loaderOpacity.value = withTiming(1)
     }
-  }, [initialAppLoading, loaderScale, loaderOpacity]);
+  }, [initialAppLoading, loaderScale, loaderOpacity])
 
   const animatedLoaderStyle = useAnimatedStyle(() => ({
     transform: [{ scale: loaderScale.value }],
     opacity: loaderOpacity.value,
-  }));
+  }))
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
-      router.replace("/");
+      router.replace('/')
     }
     if (isLoaded && isSignedIn) {
-      setInitialAppLoading(false);
+      setInitialAppLoading(false)
     }
-  }, [isLoaded, isSignedIn, router]);
+  }, [isLoaded, isSignedIn, router])
 
   useEffect(() => {
-    if (!isSignedIn || initialAppLoading) return;
+    if (!isSignedIn || initialAppLoading) return
 
     const fetchParties = async () => {
-      setContentLoading(true);
-      const cacheKey = activeTab === "explore" ? "explore_parties_cache" : "attending_parties_cache";
+      setContentLoading(true)
+      const cacheKey = activeTab === 'explore' ? 'explore_parties_cache' : 'attending_parties_cache'
 
       try {
-        const cached = await AsyncStorage.getItem(cacheKey);
+        const cached = await AsyncStorage.getItem(cacheKey)
         if (cached) {
-          setParties(JSON.parse(cached));
+          setParties(JSON.parse(cached))
         }
       } catch {
-        await AsyncStorage.removeItem(cacheKey);
+        await AsyncStorage.removeItem(cacheKey)
       }
 
       try {
-        const resp = await fetch(`${API_BASE_URL}/party`);
-        if (!resp.ok) throw new Error(`Status ${resp.status}`);
+        const resp = await fetch(`${API_BASE_URL}/party`)
+        if (!resp.ok) throw new Error(`Status ${resp.status}`)
         const data: PartyRow[] = await resp.json()
-        setParties(data);
-        await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
+        setParties(data)
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(data))
       } catch (err: any) {
-        Alert.alert("Error", `Could not load parties: ${err.message}`);
+        Alert.alert('Error', `Could not load parties: ${err.message}`)
       } finally {
-        setContentLoading(false);
+        setContentLoading(false)
       }
-    };
+    }
 
-    fetchParties();
-  }, [isSignedIn, activeTab, initialAppLoading]);
+    fetchParties()
+  }, [isSignedIn, activeTab, initialAppLoading])
 
   const handleSignOut = async () => {
-    Alert.alert("Confirm Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert('Confirm Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
       {
-        text: "Sign Out",
-        style: "destructive",
+        text: 'Sign Out',
+        style: 'destructive',
         onPress: async () => {
           try {
-            await signOut();
+            await signOut()
           } catch (e) {
-            console.error("Sign out error", e);
-            Alert.alert("Error", "Failed to sign out.");
+            console.error('Sign out error', e)
+            Alert.alert('Error', 'Failed to sign out.')
           }
         },
       },
-    ]);
-  };
+    ])
+  }
 
   const filteredParties = parties.filter((p) => {
-    const searchLower = filters.search.toLowerCase();
-    const nameMatch = p.name.toLowerCase().includes(searchLower);
-    return nameMatch;
-  });
+    const searchLower = filters.search.toLowerCase()
+    const nameMatch = p.name.toLowerCase().includes(searchLower)
+    return nameMatch
+  })
 
   const ListHeader = () => (
     <>
       <View style={styles.contentHeader}>
         <Text style={styles.contentTitle}>
-          {activeTab === "explore" ? "Explore Parties" : "Parties You're Attending"}
+          {activeTab === 'explore' ? 'Explore Parties' : "Parties You're Attending"}
         </Text>
         <Text style={styles.contentSubtitle}>
-          {activeTab === "explore" ? "Discover the hottest parties happening near you" : "Events you've RSVP'd to"}
+          {activeTab === 'explore'
+            ? 'Discover the hottest parties happening near you'
+            : "Events you've RSVP'd to"}
         </Text>
       </View>
       <SearchFilters filters={filters} setFilters={setFilters} />
     </>
-  );
+  )
 
   const EmptyListComponent = () => (
     <View style={styles.noPartiesContainer}>
@@ -246,12 +263,9 @@ const DashboardScreen: React.FC = () => {
         <Search size={40} color={AppColors.gray400} />
       </View>
       <Text style={styles.noPartiesTitle}>No parties found</Text>
-      <Text style={styles.noPartiesSubtitle}>
-        Try adjusting your search or check back later!
-      </Text>
+      <Text style={styles.noPartiesSubtitle}>Try adjusting your search or check back later!</Text>
     </View>
-  );
-
+  )
 
   if (initialAppLoading || !isLoaded) {
     return (
@@ -264,7 +278,7 @@ const DashboardScreen: React.FC = () => {
         </Animated.View>
         <Text style={styles.loaderText}>Loading PartyLink...</Text>
       </LinearGradient>
-    );
+    )
   }
 
   return (
@@ -284,13 +298,19 @@ const DashboardScreen: React.FC = () => {
           ),
           headerRight: () => (
             <View style={styles.headerIconsContainer}>
-              <TouchableOpacity onPress={() => Alert.alert("Messages", "Feature coming soon!")} style={styles.headerIconWrapper}>
+              <TouchableOpacity
+                onPress={() => Alert.alert('Messages', 'Feature coming soon!')}
+                style={styles.headerIconWrapper}
+              >
                 <MessageSquare size={24} color={AppColors.gray300} />
                 <View style={styles.messageBadge}>
                   <Text style={styles.messageBadgeText}>5</Text>
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleSignOut} style={[styles.headerIconWrapper, { marginLeft: 10 }]}>
+              <TouchableOpacity
+                onPress={handleSignOut}
+                style={[styles.headerIconWrapper, { marginLeft: 10 }]}
+              >
                 <LogOut size={24} color={AppColors.gray300} />
               </TouchableOpacity>
             </View>
@@ -300,20 +320,29 @@ const DashboardScreen: React.FC = () => {
       />
 
       <View style={styles.tabSelectorContainer}>
-        {([
-          { id: "explore", icon: Compass, label: "Explore" },
-          { id: "attending", icon: Ticket, label: "Attending" },
-        ] as const).map((item) => (
+        {(
+          [
+            { id: 'explore', icon: Compass, label: 'Explore' },
+            { id: 'attending', icon: Ticket, label: 'Attending' },
+          ] as const
+        ).map((item) => (
           <TouchableOpacity
             key={item.id}
             style={[styles.tabButton, activeTab === item.id && styles.activeTabButton]}
             onPress={() => {
-                setActiveTab(item.id);
-                setFilters({ search: "", date: "Any Date" });
+              setActiveTab(item.id)
+              setFilters({ search: '', date: 'Any Date' })
             }}
           >
-            <item.icon size={20} color={activeTab === item.id ? AppColors.pink500 : AppColors.gray300} />
-            <Text style={[styles.tabButtonText, activeTab === item.id && styles.activeTabButtonText]}>{item.label}</Text>
+            <item.icon
+              size={20}
+              color={activeTab === item.id ? AppColors.pink500 : AppColors.gray300}
+            />
+            <Text
+              style={[styles.tabButtonText, activeTab === item.id && styles.activeTabButtonText]}
+            >
+              {item.label}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -330,33 +359,60 @@ const DashboardScreen: React.FC = () => {
           keyExtractor={(item) => item.party_id}
           ListHeaderComponent={<ListHeader />}
           ListEmptyComponent={!contentLoading ? <EmptyListComponent /> : null}
-          ListFooterComponent={contentLoading && parties.length > 0 ? <ActivityIndicator size="small" color={AppColors.pink500} style={{ marginVertical: 20 }} /> : null}
-          numColumns={Platform.OS === 'web' ? 4 : (screenWidth > 768 ? 2 : 1)}
-          columnWrapperStyle={Platform.OS !== 'web' && screenWidth > 768 && filteredParties.length > 0 ? styles.flatlistColumnWrapper : undefined}
+          ListFooterComponent={
+            contentLoading && parties.length > 0 ? (
+              <ActivityIndicator
+                size="small"
+                color={AppColors.pink500}
+                style={{ marginVertical: 20 }}
+              />
+            ) : null
+          }
+          numColumns={Platform.OS === 'web' ? 4 : screenWidth > 768 ? 2 : 1}
+          columnWrapperStyle={
+            Platform.OS !== 'web' && screenWidth > 768 && filteredParties.length > 0
+              ? styles.flatlistColumnWrapper
+              : undefined
+          }
           contentContainerStyle={styles.flatListContentContainer}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         />
       )}
-
     </LinearGradient>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   dashboardContainer: { flex: 1 },
-  fullScreenLoaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  fullScreenLoaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loaderAnimationContent: { alignItems: 'center', justifyContent: 'center' },
   loaderText: { marginTop: 20, fontSize: 18, color: AppColors.white, fontWeight: '600' },
   headerTitleContainer: { flexDirection: 'row', alignItems: 'center' },
-  headerTitleText: { color: AppColors.white, fontSize: 22, fontWeight: 'bold', marginLeft: 10, letterSpacing: -0.5 },
+  headerTitleText: {
+    color: AppColors.white,
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginLeft: 10,
+    letterSpacing: -0.5,
+  },
   headerIconsContainer: { flexDirection: 'row', alignItems: 'center' },
   headerIconWrapper: { padding: 6, position: 'relative' },
-  messageBadge: { position: 'absolute', top: 3, right: 3, backgroundColor: AppColors.pink500, borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
+  messageBadge: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    backgroundColor: AppColors.pink500,
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   messageBadgeText: { color: AppColors.white, fontSize: 10, fontWeight: 'bold' },
   tabSelectorContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     backgroundColor: AppColors.secondaryBg,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -364,7 +420,7 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flexDirection: 'row',
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
@@ -373,9 +429,8 @@ const styles = StyleSheet.create({
   tabButtonText: { marginLeft: 8, fontSize: 15, color: AppColors.gray300, fontWeight: '500' },
   activeTabButtonText: { color: AppColors.pink500, fontWeight: 'bold' },
 
-
-  contentHeader: { marginVertical: 24, paddingHorizontal: 16, },
-  contentTitle: { fontSize: 26, fontWeight: "bold", color: AppColors.white, marginBottom: 6 },
+  contentHeader: { marginVertical: 24, paddingHorizontal: 16 },
+  contentTitle: { fontSize: 26, fontWeight: 'bold', color: AppColors.white, marginBottom: 6 },
   contentSubtitle: { fontSize: 15, color: AppColors.gray300 },
 
   searchFiltersContainer: {
@@ -419,27 +474,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
 
-  centeredLoader: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 50, minHeight: 300 },
+  centeredLoader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+    minHeight: 300,
+  },
   loadingPartiesText: { marginTop: 12, fontSize: 16, color: AppColors.gray300 },
 
-
-  noPartiesContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 60, minHeight: 300, paddingHorizontal: 16, },
+  noPartiesContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    minHeight: 300,
+    paddingHorizontal: 16,
+  },
   noPartiesIconBg: {
     width: 70,
     height: 70,
     borderRadius: 35,
     backgroundColor: AppColors.inputBg,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 20,
   },
-  noPartiesTitle: { fontSize: 20, fontWeight: "bold", color: AppColors.white, marginBottom: 10 },
-  noPartiesSubtitle: { fontSize: 14, color: AppColors.gray300, textAlign: "center", maxWidth: "85%" },
+  noPartiesTitle: { fontSize: 20, fontWeight: 'bold', color: AppColors.white, marginBottom: 10 },
+  noPartiesSubtitle: {
+    fontSize: 14,
+    color: AppColors.gray300,
+    textAlign: 'center',
+    maxWidth: '85%',
+  },
 
   partyCardContainer: {
     backgroundColor: AppColors.cardBg,
     borderRadius: 12,
-    overflow: "hidden",
+    overflow: 'hidden',
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -449,16 +521,27 @@ const styles = StyleSheet.create({
     flex: screenWidth > 768 ? undefined : 1,
     marginHorizontal: screenWidth > 768 ? 8 : 0,
   },
-  partyCardImage: { width: "100%", height: 160 },
+  partyCardImage: { width: '100%', height: 160 },
   partyCardContent: { padding: 16, flexGrow: 1 },
-  partyCardName: { fontSize: 18, fontWeight: "bold", color: AppColors.white, marginBottom: 10, lineHeight: 24 },
-  partyCardRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  partyCardName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: AppColors.white,
+    marginBottom: 10,
+    lineHeight: 24,
+  },
+  partyCardRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   partyCardIcon: { marginRight: 8 },
   partyCardText: { fontSize: 13, color: AppColors.gray300, flexShrink: 1 },
   ticketBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
   ticketBadgeText: { fontSize: 11, fontWeight: '600' },
-  partyCardButton: { backgroundColor: AppColors.pink500, paddingVertical: 14, alignItems: "center", justifyContent: "center" },
-  partyCardButtonText: { color: AppColors.white, fontSize: 16, fontWeight: "600" },
+  partyCardButton: {
+    backgroundColor: AppColors.pink500,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  partyCardButtonText: { color: AppColors.white, fontSize: 16, fontWeight: '600' },
 
   footer: {
     paddingVertical: 20,
@@ -471,8 +554,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-  }
-});
+  },
+})
 
-
-export default DashboardScreen;
+export default DashboardScreen

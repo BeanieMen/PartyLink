@@ -1,65 +1,68 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { SplashScreen, Stack, router } from 'expo-router';
-import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
-import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
-import * as SecureStore from 'expo-secure-store';
-import { ActivityIndicator, View } from 'react-native';
-import Colors from '@/constants'; 
-import React from 'react';
+import FontAwesome from '@expo/vector-icons/FontAwesome'
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
+import { useFonts } from 'expo-font'
+import { SplashScreen, Stack, router } from 'expo-router'
+import React, { useEffect } from 'react'
+import { useColorScheme, ActivityIndicator, View } from 'react-native'
+import { ClerkProvider, useAuth } from '@clerk/clerk-expo'
+import * as SecureStore from 'expo-secure-store'
+import Colors from '@/constants'
 
 const tokenCache = {
   async getToken(key: string) {
     try {
-      return SecureStore.getItemAsync(key);
-    } catch (err) {
-      return null;
+      return SecureStore.getItemAsync(key)
+    } catch (_err) {
+      return null
     }
   },
   async saveToken(key: string, value: string) {
     try {
-      return SecureStore.setItemAsync(key, value);
-    } catch (err) {
-      return;
+      return SecureStore.setItemAsync(key, value)
+    } catch (_err) {
+      return
     }
   },
-};
+}
 
-const CLERK_PUBLISHABLE_KEY = "pk_test_c3VwcmVtZS1ncm91c2UtNDQuY2xlcmsuYWNjb3VudHMuZGV2JA";
+const CLERK_PUBLISHABLE_KEY = 'pk_test_c3VwcmVtZS1ncm91c2UtNDQuY2xlcmsuYWNjb3VudHMuZGV2JA'
 
-export {
-  ErrorBoundary,
-} from 'expo-router';
+export { ErrorBoundary } from 'expo-router'
 
 export const unstable_settings = {
   initialRouteName: 'index',
-};
+}
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync()
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme(); 
-  const { isLoaded, isSignedIn } = useAuth();
+  const colorScheme = useColorScheme()
+  const { isLoaded, isSignedIn } = useAuth()
 
   useEffect(() => {
     if (isLoaded) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync()
       if (isSignedIn) {
-        router.replace('/create-profile');
+        router.replace('/create-profile')
       } else {
-        router.replace('/');
+        router.replace('/')
       }
     }
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn])
 
   if (!isLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.dark.primaryBg }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: Colors.dark.primaryBg,
+        }}
+      >
         <ActivityIndicator size="large" color={Colors.dark.pink400} />
       </View>
-    );
+    )
   }
 
   return (
@@ -67,28 +70,28 @@ function RootLayoutNav() {
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        </Stack>
+      </Stack>
     </ThemeProvider>
-  );
+  )
 }
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
-  });
+  })
 
   useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+    if (error) throw error
+  }, [error])
 
   if (!loaded) {
-    return null;
+    return null
   }
 
   return (
     <ClerkProvider tokenCache={tokenCache} publishableKey={CLERK_PUBLISHABLE_KEY!}>
       <RootLayoutNav />
     </ClerkProvider>
-  );
+  )
 }

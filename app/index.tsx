@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react'
 import {
   View,
   Text,
@@ -9,9 +9,9 @@ import {
   Platform,
   TextInput,
   Alert,
-} from 'react-native';
-import { useAuth, useSignIn, useSignUp, useSSO } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
+} from 'react-native'
+import { useAuth, useSignIn, useSignUp, useSSO } from '@clerk/clerk-expo'
+import { useRouter } from 'expo-router'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -21,38 +21,53 @@ import Animated, {
   withDelay,
   FadeIn,
   FadeInUp,
-} from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
+} from 'react-native-reanimated'
+import { LinearGradient } from 'expo-linear-gradient'
 import { PartyPopper, ArrowLeft } from 'lucide-react-native'
-import { Ionicons } from '@expo/vector-icons';
-import Spinner from 'react-native-loading-spinner-overlay';
-import * as Linking from 'expo-linking'; 
-import Colors from '@/constants'; 
-import { API_BASE_URL } from '@/constants';
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+import { Ionicons } from '@expo/vector-icons'
+import Spinner from 'react-native-loading-spinner-overlay'
+import * as Linking from 'expo-linking'
+import Colors, { API_BASE_URL } from '@/constants'
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
 
-// Subtle Animated Particle (optional, for a bit of flair)
 const AnimatedParticle = ({ index }: { index: number }) => {
-  const x = useSharedValue(Math.random() * screenWidth);
-  const y = useSharedValue(Math.random() * screenHeight);
-  const scale = useSharedValue(0.5 + Math.random() * 5);
-  const opacity = useSharedValue(0.1 + Math.random() * 0.2);
+  const x = useSharedValue(Math.random() * screenWidth)
+  const y = useSharedValue(Math.random() * screenHeight)
+  const scale = useSharedValue(0.5 + Math.random() * 5)
+  const opacity = useSharedValue(0.1 + Math.random() * 0.2)
 
   useEffect(() => {
-    const randomDelay = Math.random() * 1000;
-    const duration = 10000 + Math.random() * 10000;
-    x.value = withDelay(randomDelay, withRepeat(withTiming(Math.random() * screenWidth, { duration, easing: Easing.linear }), -1, true));
-    y.value = withDelay(randomDelay, withRepeat(withTiming(Math.random() * screenHeight, { duration, easing: Easing.linear }), -1, true));
-    scale.value = withDelay(randomDelay, withRepeat(withTiming(0.5 + Math.random() * 0.5, { duration: duration / 2 }), -1, true));
-  }, [x, y, scale]);
+    const randomDelay = Math.random() * 1000
+    const duration = 10000 + Math.random() * 10000
+    x.value = withDelay(
+      randomDelay,
+      withRepeat(
+        withTiming(Math.random() * screenWidth, { duration, easing: Easing.linear }),
+        -1,
+        true,
+      ),
+    )
+    y.value = withDelay(
+      randomDelay,
+      withRepeat(
+        withTiming(Math.random() * screenHeight, { duration, easing: Easing.linear }),
+        -1,
+        true,
+      ),
+    )
+    scale.value = withDelay(
+      randomDelay,
+      withRepeat(withTiming(0.5 + Math.random() * 0.5, { duration: duration / 2 }), -1, true),
+    )
+  }, [x, y, scale])
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }, { translateY: y.value }, { scale: scale.value }],
     opacity: opacity.value,
-  }));
+  }))
 
-  const particleSize = Math.random() * 30 + 20;
-  const particleColors = [Colors.dark.pink500, '#AF00FF', '#00E0FF', Colors.dark.yellow400];
+  const particleSize = Math.random() * 30 + 20
+  const particleColors = [Colors.dark.pink500, '#AF00FF', '#00E0FF', Colors.dark.yellow400]
 
   return (
     <Animated.View
@@ -66,147 +81,163 @@ const AnimatedParticle = ({ index }: { index: number }) => {
         animatedStyle,
       ]}
     />
-  );
-};
-
+  )
+}
 
 const IndexPage = () => {
-  const { isLoaded, isSignedIn, userId } = useAuth();
-  const router = useRouter();
+  const { isLoaded, isSignedIn, userId } = useAuth()
+  const router = useRouter()
 
-  const [authView, setAuthView] = useState<'landing' | 'signin' | 'signup' | 'verify'>('landing');
-  const [emailAddress, setEmailAddress] = useState('');
-  const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
-  const [loading, setLoading] = useState(false); // For email/pass actions
-  const [ssoProviderLoading, setSsoProviderLoading] = useState<'google' | 'discord' | null>(null); // For SSO loading
+  const [authView, setAuthView] = useState<'landing' | 'signin' | 'signup' | 'verify'>('landing')
+  const [emailAddress, setEmailAddress] = useState('')
+  const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
+  const [loading, setLoading] = useState(false) // For email/pass actions
+  const [ssoProviderLoading, setSsoProviderLoading] = useState<'google' | 'discord' | null>(null) // For SSO loading
 
-  const { signIn, setActive: setActiveSignIn, isLoaded: isSignInLoaded } = useSignIn();
-  const { signUp, setActive: setActiveSignUp, isLoaded: isSignUpLoaded } = useSignUp();
-  const { startSSOFlow } = useSSO();
+  const { signIn, setActive: setActiveSignIn, isLoaded: isSignInLoaded } = useSignIn()
+  const { signUp, setActive: setActiveSignUp, isLoaded: isSignUpLoaded } = useSignUp()
+  const { startSSOFlow } = useSSO()
 
   useEffect(() => {
     const fetchUserData = async () => {
       if (isLoaded && isSignedIn) {
-          const response = await fetch(`${API_BASE_URL}/user/${userId}`);
-          const userData = await response.json();
-          
-          if (Object.keys(userData).length === 0) {
-            router.replace('/create-profile');
-          } else {
-            router.replace('/dashboard');
-          }
-   
-      }
-    };
+        const response = await fetch(`${API_BASE_URL}/user/${userId}`)
+        const userData = await response.json()
 
-    fetchUserData(); 
-
-  }, [isLoaded, isSignedIn, userId, router]);
-
-
-  const clearForm = () => {
-    setEmailAddress('');
-    setPassword('');
-    setCode('');
-  };
-
-
-
-  const handleOAuth = useCallback(async (strategy: 'oauth_google' | 'oauth_discord') => {
-    setSsoProviderLoading(strategy === 'oauth_google' ? 'google' : 'discord');
-    try {
-      const redirectUrl = Linking.createURL('/oauth-callback');
-
-      const { createdSessionId, setActive, signIn, signUp } = await startSSOFlow({ strategy, redirectUrl });
-
-
-
-      if (createdSessionId && setActive) {
-        await setActive({ session: createdSessionId });
-        setAuthView('landing');
-        clearForm();
-      } else if (signIn || signUp) {
-        let message = 'Please complete the authentication process.';
-        if (signIn) {
-          console.log('SSO requires further sign-in steps. Status:', signIn.status);
+        if (Object.keys(userData).length === 0) {
+          router.replace('/create-profile')
+        } else {
+          router.replace('/dashboard')
         }
-        if (signUp) {
-          console.log('SSO requires further sign-up steps. Status:', signUp.status);
-        }
-        Alert.alert('Authentication Incomplete', message);
-      } else {
-        console.warn('SSO flow did not result in a session or further specific steps.');
-        Alert.alert('Authentication Issue', 'The authentication process could not be completed as expected.');
       }
-    } catch (err: any) {
-      console.error(`SSO Error (${strategy}):`, JSON.stringify(err));
-      const errorMessage = err.errors?.[0]?.longMessage || err.errors?.[0]?.message || err.message || 'An unknown error occurred during SSO.';
-      Alert.alert('Authentication Error', errorMessage);
-    } finally {
-      setSsoProviderLoading(null);
     }
-  }, [startSSOFlow, clearForm, setAuthView]);
+
+    fetchUserData()
+  }, [isLoaded, isSignedIn, userId, router])
+
+  const clearForm = useCallback(() => {
+    setEmailAddress('')
+    setPassword('')
+    setCode('')
+  }, [])
+
+  const handleOAuth = useCallback(
+    async (strategy: 'oauth_google' | 'oauth_discord') => {
+      setSsoProviderLoading(strategy === 'oauth_google' ? 'google' : 'discord')
+      try {
+        const redirectUrl = Linking.createURL('/oauth-callback')
+
+        const { createdSessionId, setActive, signIn, signUp } = await startSSOFlow({
+          strategy,
+          redirectUrl,
+        })
+
+        if (createdSessionId && setActive) {
+          await setActive({ session: createdSessionId })
+          setAuthView('landing')
+          clearForm()
+        } else if (signIn || signUp) {
+          let message = 'Please complete the authentication process.'
+          if (signIn) {
+            console.log('SSO requires further sign-in steps. Status:', signIn.status)
+          }
+          if (signUp) {
+            console.log('SSO requires further sign-up steps. Status:', signUp.status)
+          }
+          Alert.alert('Authentication Incomplete', message)
+        } else {
+          console.warn('SSO flow did not result in a session or further specific steps.')
+          Alert.alert(
+            'Authentication Issue',
+            'The authentication process could not be completed as expected.',
+          )
+        }
+      } catch (err: any) {
+        console.error(`SSO Error (${strategy}):`, JSON.stringify(err))
+        const errorMessage =
+          err.errors?.[0]?.longMessage ||
+          err.errors?.[0]?.message ||
+          err.message ||
+          'An unknown error occurred during SSO.'
+        Alert.alert('Authentication Error', errorMessage)
+      } finally {
+        setSsoProviderLoading(null)
+      }
+    },
+    [startSSOFlow, clearForm, setAuthView],
+  )
 
   const handleSignIn = async () => {
-    if (!isSignInLoaded) return;
-    setLoading(true);
+    if (!isSignInLoaded) return
+    setLoading(true)
     try {
       const completeSignIn = await signIn.create({
         identifier: emailAddress,
         password,
-      });
-      await setActiveSignIn({ session: completeSignIn.createdSessionId });
-      setAuthView('landing');
-      clearForm();
+      })
+      await setActiveSignIn({ session: completeSignIn.createdSessionId })
+      setAuthView('landing')
+      clearForm()
     } catch (err: any) {
-      console.error('Sign In Error:', JSON.stringify(err));
-      Alert.alert('Sign In Error', err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid email or password.');
+      console.error('Sign In Error:', JSON.stringify(err))
+      Alert.alert(
+        'Sign In Error',
+        err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid email or password.',
+      )
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleSignUp = async () => {
-    if (!isSignUpLoaded) return;
-    setLoading(true);
+    if (!isSignUpLoaded) return
+    setLoading(true)
     try {
       await signUp.create({
         emailAddress,
         password,
-      });
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-      setAuthView('verify');
-      Alert.alert("Verification Code Sent", "Please check your email for a verification code.");
+      })
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
+      setAuthView('verify')
+      Alert.alert('Verification Code Sent', 'Please check your email for a verification code.')
     } catch (err: any) {
-      console.error('Sign Up Error:', JSON.stringify(err));
-      Alert.alert('Sign Up Error', err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Could not create account.');
+      console.error('Sign Up Error:', JSON.stringify(err))
+      Alert.alert(
+        'Sign Up Error',
+        err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Could not create account.',
+      )
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleVerification = async () => {
-    if (!isSignUpLoaded) return;
-    setLoading(true);
+    if (!isSignUpLoaded) return
+    setLoading(true)
     try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({ code });
+      const completeSignUp = await signUp.attemptEmailAddressVerification({ code })
       if (completeSignUp.status === 'complete') {
-        await setActiveSignUp({ session: completeSignUp.createdSessionId });
-        setAuthView('landing');
-        clearForm();
+        await setActiveSignUp({ session: completeSignUp.createdSessionId })
+        setAuthView('landing')
+        clearForm()
       } else {
-        console.warn("Verification not complete:", JSON.stringify(completeSignUp));
-        Alert.alert("Verification Incomplete", "The code is incorrect or has expired. Please try again.");
+        console.warn('Verification not complete:', JSON.stringify(completeSignUp))
+        Alert.alert(
+          'Verification Incomplete',
+          'The code is incorrect or has expired. Please try again.',
+        )
       }
     } catch (err: any) {
-      console.error('Verification Error:', JSON.stringify(err));
-      Alert.alert('Verification Error', err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid verification code.');
+      console.error('Verification Error:', JSON.stringify(err))
+      Alert.alert(
+        'Verification Error',
+        err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid verification code.',
+      )
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
-
+  }
 
   if (!isLoaded && !isSignedIn) {
     return (
@@ -217,7 +248,7 @@ const IndexPage = () => {
         <ActivityIndicator size="large" color={Colors.dark.pink400} />
         <Text style={styles.loadingText}>Initializing PartyLink...</Text>
       </LinearGradient>
-    );
+    )
   }
 
   const renderLandingContent = () => (
@@ -235,89 +266,200 @@ const IndexPage = () => {
       <Animated.View entering={FadeIn.duration(800).delay(700)} style={styles.buttonContainer}>
         <TouchableOpacity
           style={[styles.button, styles.signUpButton]}
-          onPress={() => { clearForm(); setAuthView('signup'); }}
+          onPress={() => {
+            clearForm()
+            setAuthView('signup')
+          }}
         >
           <Text style={styles.buttonText}>Create Account</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.loginButton]}
-          onPress={() => { clearForm(); setAuthView('signin'); }}
+          onPress={() => {
+            clearForm()
+            setAuthView('signin')
+          }}
         >
           <Text style={[styles.buttonText, styles.loginButtonText]}>Log In</Text>
         </TouchableOpacity>
       </Animated.View>
     </>
-  );
+  )
 
-  const renderAuthFormBase = (title: string, children: React.ReactNode, backView: 'landing' | 'signup' = 'landing') => (
+  const renderAuthFormBase = (
+    title: string,
+    children: React.ReactNode,
+    backView: 'landing' | 'signup' = 'landing',
+  ) => (
     <View style={styles.authFormContainer}>
-      <TouchableOpacity onPress={() => { clearForm(); setAuthView(backView); }} style={styles.backToHomeButton}>
+      <TouchableOpacity
+        onPress={() => {
+          clearForm()
+          setAuthView(backView)
+        }}
+        style={styles.backToHomeButton}
+      >
         <ArrowLeft size={24} color={Colors.dark.text} />
-        <Text style={styles.backToHomeButtonText}>{backView === 'landing' ? 'Back to Home' : 'Back to Sign Up'}</Text>
+        <Text style={styles.backToHomeButtonText}>
+          {backView === 'landing' ? 'Back to Home' : 'Back to Sign Up'}
+        </Text>
       </TouchableOpacity>
       <Text style={styles.authTitle}>{title}</Text>
       {children}
     </View>
-  );
+  )
 
+  const renderSignInContent = () =>
+    renderAuthFormBase(
+      'Log In to PartyLink',
+      <>
+        <TextInput
+          placeholder="Email Address"
+          value={emailAddress}
+          onChangeText={setEmailAddress}
+          style={styles.inputField}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          placeholderTextColor={Colors.dark.gray400}
+        />
+        <TextInput
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          style={styles.inputField}
+          secureTextEntry
+          placeholderTextColor={Colors.dark.gray400}
+        />
+        <TouchableOpacity
+          style={[styles.authButtonInternal, styles.submitButton]}
+          onPress={handleSignIn}
+          disabled={loading || ssoProviderLoading !== null}
+        >
+          <Text style={styles.authButtonText}>Log In</Text>
+        </TouchableOpacity>
+        <Text style={styles.orText}>OR</Text>
+        <TouchableOpacity
+          style={[styles.authButtonInternal, styles.googleButton]}
+          onPress={() => handleOAuth('oauth_google')}
+          disabled={loading || ssoProviderLoading !== null}
+        >
+          <Ionicons name="logo-google" size={20} color="#fff" style={styles.oauthIcon} />
+          <Text style={[styles.authButtonText, styles.googleButtonText]}>Continue with Google</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.authButtonInternal, styles.discordButton]}
+          onPress={() => handleOAuth('oauth_discord')}
+          disabled={loading || ssoProviderLoading !== null}
+        >
+          <Ionicons
+            name="logo-discord"
+            size={20}
+            color={Colors.dark.white}
+            style={styles.oauthIcon}
+          />
+          <Text style={[styles.authButtonText, styles.discordButtonText]}>
+            Continue with Discord
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            clearForm()
+            setAuthView('signup')
+          }}
+          style={styles.switchAuthLink}
+        >
+          <Text style={styles.switchAuthText}>Don&apos;t have an account? Sign Up</Text>
+        </TouchableOpacity>
+      </>,
+    )
 
-  const renderSignInContent = () => renderAuthFormBase(
-    "Log In to PartyLink",
-    <>
-      <TextInput placeholder="Email Address" value={emailAddress} onChangeText={setEmailAddress} style={styles.inputField} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={Colors.dark.gray400} />
-      <TextInput placeholder="Password" value={password} onChangeText={setPassword} style={styles.inputField} secureTextEntry placeholderTextColor={Colors.dark.gray400} />
-      <TouchableOpacity style={[styles.authButtonInternal, styles.submitButton]} onPress={handleSignIn} disabled={loading || ssoProviderLoading !== null}>
-        <Text style={styles.authButtonText}>Log In</Text>
-      </TouchableOpacity>
-      <Text style={styles.orText}>OR</Text>
-      <TouchableOpacity style={[styles.authButtonInternal, styles.googleButton]} onPress={() => handleOAuth('oauth_google')} disabled={loading || ssoProviderLoading !== null}>
-        <Ionicons name="logo-google" size={20} color="#fff" style={styles.oauthIcon} />
-        <Text style={[styles.authButtonText, styles.googleButtonText]}>Continue with Google</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.authButtonInternal, styles.discordButton]} onPress={() => handleOAuth('oauth_discord')} disabled={loading || ssoProviderLoading !== null}>
-        <Ionicons name="logo-discord" size={20} color={Colors.dark.white} style={styles.oauthIcon} />
-        <Text style={[styles.authButtonText, styles.discordButtonText]}>Continue with Discord</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => { clearForm(); setAuthView('signup'); }} style={styles.switchAuthLink}>
-        <Text style={styles.switchAuthText}>Don't have an account? Sign Up</Text>
-      </TouchableOpacity>
-    </>
-  );
+  const renderSignUpContent = () =>
+    renderAuthFormBase(
+      'Create your PartyLink Account',
+      <>
+        <TextInput
+          placeholder="Email Address"
+          value={emailAddress}
+          onChangeText={setEmailAddress}
+          style={styles.inputField}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          placeholderTextColor={Colors.dark.gray400}
+        />
+        <TextInput
+          placeholder="Password (min. 8 characters)"
+          value={password}
+          onChangeText={setPassword}
+          style={styles.inputField}
+          secureTextEntry
+          placeholderTextColor={Colors.dark.gray400}
+        />
+        <TouchableOpacity
+          style={[styles.authButtonInternal, styles.submitButton]}
+          onPress={handleSignUp}
+          disabled={loading || ssoProviderLoading !== null}
+        >
+          <Text style={styles.authButtonText}>Create Account</Text>
+        </TouchableOpacity>
+        <Text style={styles.orText}>OR</Text>
+        <TouchableOpacity
+          style={[styles.authButtonInternal, styles.googleButton]}
+          onPress={() => handleOAuth('oauth_google')}
+          disabled={loading || ssoProviderLoading !== null}
+        >
+          <Ionicons name="logo-google" size={20} color="#fff" style={styles.oauthIcon} />
+          <Text style={[styles.authButtonText, styles.googleButtonText]}>Sign Up with Google</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.authButtonInternal, styles.discordButton]}
+          onPress={() => handleOAuth('oauth_discord')}
+          disabled={loading || ssoProviderLoading !== null}
+        >
+          <Ionicons
+            name="logo-discord"
+            size={20}
+            color={Colors.dark.white}
+            style={styles.oauthIcon}
+          />
+          <Text style={[styles.authButtonText, styles.discordButtonText]}>
+            Sign Up with Discord
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            clearForm()
+            setAuthView('signin')
+          }}
+          style={styles.switchAuthLink}
+        >
+          <Text style={styles.switchAuthText}>Already have an account? Log In</Text>
+        </TouchableOpacity>
+      </>,
+    )
 
-  const renderSignUpContent = () => renderAuthFormBase(
-    "Create your PartyLink Account",
-    <>
-      <TextInput placeholder="Email Address" value={emailAddress} onChangeText={setEmailAddress} style={styles.inputField} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={Colors.dark.gray400} />
-      <TextInput placeholder="Password (min. 8 characters)" value={password} onChangeText={setPassword} style={styles.inputField} secureTextEntry placeholderTextColor={Colors.dark.gray400} />
-      <TouchableOpacity style={[styles.authButtonInternal, styles.submitButton]} onPress={handleSignUp} disabled={loading || ssoProviderLoading !== null}>
-        <Text style={styles.authButtonText}>Create Account</Text>
-      </TouchableOpacity>
-      <Text style={styles.orText}>OR</Text>
-      <TouchableOpacity style={[styles.authButtonInternal, styles.googleButton]} onPress={() => handleOAuth('oauth_google')} disabled={loading || ssoProviderLoading !== null}>
-        <Ionicons name="logo-google" size={20} color="#fff" style={styles.oauthIcon} />
-        <Text style={[styles.authButtonText, styles.googleButtonText]}>Sign Up with Google</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.authButtonInternal, styles.discordButton]} onPress={() => handleOAuth('oauth_discord')} disabled={loading || ssoProviderLoading !== null}>
-        <Ionicons name="logo-discord" size={20} color={Colors.dark.white} style={styles.oauthIcon} />
-        <Text style={[styles.authButtonText, styles.discordButtonText]}>Sign Up with Discord</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => { clearForm(); setAuthView('signin'); }} style={styles.switchAuthLink}>
-        <Text style={styles.switchAuthText}>Already have an account? Log In</Text>
-      </TouchableOpacity>
-    </>
-  );
-
-  const renderVerificationContent = () => renderAuthFormBase(
-    "Verify Your Email",
-    <>
-      <Text style={styles.verificationSubtitle}>Enter the code sent to {emailAddress}</Text>
-      <TextInput placeholder="Verification Code" value={code} onChangeText={setCode} style={styles.inputField} keyboardType="number-pad" placeholderTextColor={Colors.dark.gray400} />
-      <TouchableOpacity style={[styles.authButtonInternal, styles.submitButton]} onPress={handleVerification} disabled={loading}>
-        <Text style={styles.authButtonText}>Verify Email</Text>
-      </TouchableOpacity>
-    </>,
-    'signup'
-  );
+  const renderVerificationContent = () =>
+    renderAuthFormBase(
+      'Verify Your Email',
+      <>
+        <Text style={styles.verificationSubtitle}>Enter the code sent to {emailAddress}</Text>
+        <TextInput
+          placeholder="Verification Code"
+          value={code}
+          onChangeText={setCode}
+          style={styles.inputField}
+          keyboardType="number-pad"
+          placeholderTextColor={Colors.dark.gray400}
+        />
+        <TouchableOpacity
+          style={[styles.authButtonInternal, styles.submitButton]}
+          onPress={handleVerification}
+          disabled={loading}
+        >
+          <Text style={styles.authButtonText}>Verify Email</Text>
+        </TouchableOpacity>
+      </>,
+      'signup',
+    )
 
   return (
     <LinearGradient
@@ -336,13 +478,17 @@ const IndexPage = () => {
       </View>
       <Spinner
         visible={loading || ssoProviderLoading !== null}
-        textContent={ssoProviderLoading ? `Connecting with ${ssoProviderLoading.charAt(0).toUpperCase() + ssoProviderLoading.slice(1)}...` : 'Processing...'}
+        textContent={
+          ssoProviderLoading
+            ? `Connecting with ${ssoProviderLoading.charAt(0).toUpperCase() + ssoProviderLoading.slice(1)}...`
+            : 'Processing...'
+        }
         textStyle={styles.spinnerTextStyle}
         overlayColor="rgba(0,0,0,0.6)"
       />
     </LinearGradient>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -526,9 +672,7 @@ const styles = StyleSheet.create({
     color: Colors.dark.text,
     marginLeft: 5,
     fontSize: 14,
-  }
-});
+  },
+})
 
-
-
-export default IndexPage;
+export default IndexPage
