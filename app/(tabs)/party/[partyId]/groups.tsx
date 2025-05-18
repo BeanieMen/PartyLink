@@ -126,7 +126,7 @@ const GroupDetailsScreen: React.FC = () => {
     } finally {
       setIsLoadingGroupDetails(false)
     }
-  }, [userGroupId, userId, setIsLoadingGroupDetails, setError, setGroupDetails]) // Add all external dependencies
+  }, [userGroupId, userId, setIsLoadingGroupDetails, setError, setGroupDetails])  
 
   useEffect(() => {
     const findUserGroup = async () => {

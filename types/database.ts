@@ -134,3 +134,10 @@ export interface GroupMessageRow {
   read_at: string | null
   created_at: string
 }
+
+export interface GroupDislikeRow {
+  dislike_id: string;
+  user_id: string;
+  group_id: string;
+  created_at: string;
+}

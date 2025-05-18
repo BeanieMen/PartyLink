@@ -97,7 +97,6 @@ const JoinGroupScreen = () => {
             }
           })
           .filter((result) => {
-            // Added .toLowerCase() for case-insensitive search
             return result.creator_username.toLowerCase().startsWith(query.toLowerCase())
           })
 
@@ -111,8 +110,7 @@ const JoinGroupScreen = () => {
       }
     },
     [partyId, setIsLoadingSearch, setError, setSearchedGroups],
-  ) // Add all external dependencies
-
+  )
   useEffect(() => {
     fetchSearchedGroupsApi(searchTerm)
   }, [searchTerm, partyId, fetchSearchedGroupsApi])
@@ -186,7 +184,7 @@ const JoinGroupScreen = () => {
     setIsLoadingInvitations,
     setPendingInvitations,
     setUserOutgoingRequestGroupId,
-  ]) // Add all external dependencies
+  ]) 
 
   useEffect(() => {
     fetchData()
