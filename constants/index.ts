@@ -5,19 +5,23 @@ export const pink500 = '#EC4899'
 export const pink400 = '#F472B6'
 export const pink600 = '#DB2777'
 export const pink300 = '#FF80AB'
-
+export const pink700 = '#C2185B'
 export const white = '#FFFFFF'
 export const black = '#000000'
 
+export const gray100 = '#F3F4F6' 
+export const gray200 = '#E5E7EB' 
 export const gray300 = '#D1D5DB'
 export const gray400 = '#9CA3AF'
-export const gray500 = '#9E9E9E'
+export const gray500 = '#9E9E9E' 
 export const gray600 = '#4B5563'
 export const gray700 = '#374151'
+export const gray800 = '#1F2937' 
 export const textGray = '#A0A0A0'
 
 export const yellow400 = '#FACC15'
 
+export const blue300 = '#64B5F6'
 export const blue400 = '#60A5FA'
 export const blue500 = '#3B82F6'
 
@@ -45,13 +49,13 @@ export const tertiaryBg = '#3A1F5D'
 export const darkerBg = '#58216d'
 
 export const inputBg = '#3B3E45'
-export const cardBg = '#3A1F5D'
+export const cardBg = '#3A1F5D' 
 
 export const secondaryBgTransparent = 'rgba(45, 48, 53, 0.85)'
 
-export const textGray300 = '#D1D5DB'
-export const textGray400 = '#9CA3AF'
-export const textBlack = '#000000'
+export const textGray300 = '#D1D5DB' 
+export const textGray400 = '#9CA3AF' 
+export const textBlack = '#000000' 
 
 export default {
   light: {
@@ -60,6 +64,20 @@ export default {
     tint: tintColorLight,
     tabIconDefault: '#ccc',
     tabIconSelected: tintColorLight,
+    
+    primary: primary, 
+    primaryBg: white,
+    secondaryBg: gray100,
+    cardBg: white,
+    gray100,
+    gray200,
+    gray300,
+    gray400,
+    gray500,
+    gray600,
+    gray700,
+    gray800,
+    
   },
   dark: {
     text: white,
@@ -68,23 +86,29 @@ export default {
     tabIconDefault: '#ccc',
     tabIconSelected: tintColorDark,
 
+
     pink500,
     pink400,
     pink600,
     pink300,
+    pink700,
 
     white,
     black,
 
+    gray100, 
+    gray200, 
     gray300,
     gray400,
     gray500,
     gray600,
     gray700,
+    gray800, 
     textGray,
 
     yellow400,
 
+    blue300,
     blue400,
     blue500,
 
@@ -113,11 +137,13 @@ export default {
     inputBg,
     cardBg,
     secondaryBgTransparent,
-
+    orange400: '#FF9800', // Add this
+    red500: '#DC3545', // Add this
     textGray300,
     textGray400,
     textBlack,
   },
 }
 
-export const API_BASE_URL = 'http://192.168.1.2:3000'
+// export const API_BASE_URL = 'http://140.238.160.248:3000'
+export const API_BASE_URL = 'http://192.168.1.17:3000'

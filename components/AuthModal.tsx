@@ -26,12 +26,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialView }) =
   const { startSSOFlow } = useSSO()
   const [provider, setProvider] = useState<'google' | 'discord' | null>(null)
 
-  useEffect(() => {
-    if (isOpen) {
-      // Log only when attempting to open
-      console.log('AuthModal: isOpen =', isOpen, 'isClerkLoaded =', isClerkLoaded)
-    }
-  }, [isOpen, isClerkLoaded])
 
   const handleSSO = useCallback(
     async (strategy: 'oauth_google' | 'oauth_discord') => {

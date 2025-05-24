@@ -51,8 +51,6 @@ interface DisplayableSearchedGroup {
   party_id: GroupRow['party_id']
   creator_user_id: GroupRow['creator_user_id']
   creator_username: GroupRow['creator_username']
-  max_members: GroupRow['max_members']
-  creator_pfp_url: UserRow['pfp_url']
 }
 
 const JoinGroupScreen = () => {
@@ -92,8 +90,6 @@ const JoinGroupScreen = () => {
               party_id: apiItem.party_id,
               creator_user_id: apiItem.creator_user_id,
               creator_username: apiItem.creator_username,
-              max_members: apiItem.max_members,
-              creator_pfp_url: `${API_BASE_URL}/user/${apiItem.creator_user_id}/profile-picture`,
             }
           })
           .filter((result) => {
@@ -109,7 +105,7 @@ const JoinGroupScreen = () => {
         setIsLoadingSearch(false)
       }
     },
-    [partyId, setIsLoadingSearch, setError, setSearchedGroups],
+    [partyId, setIsLoadingSearch, setSearchedGroups],
   )
   useEffect(() => {
     fetchSearchedGroupsApi(searchTerm)
@@ -139,7 +135,6 @@ const JoinGroupScreen = () => {
         inviter: {
           userId: string
           username: string
-          pfp_url: string | null
         }
         created_at: string
       }[] = await invRes.json()
@@ -162,7 +157,7 @@ const JoinGroupScreen = () => {
     }
 
     try {
-      const reqRes = await fetch(`${API_BASE_URL}/users/${userId}/requests?partyId=${partyId}`)
+      const reqRes = await fetch(`${API_BASE_URL}/user/${userId}/invitations/requests?partyId=${partyId}`)
       if (!reqRes.ok) {
         if (reqRes.status === 404) {
           setUserOutgoingRequestGroupId(null)
@@ -170,8 +165,25 @@ const JoinGroupScreen = () => {
           throw new Error(`Failed to fetch outgoing request: ${reqRes.statusText}`)
         }
       } else {
-        const requestData: { group_id: GroupRow['group_id'] } | null = await reqRes.json()
-        setUserOutgoingRequestGroupId(requestData?.group_id || null)
+        const requestData: {
+          group_member_id: string;
+          group_id: string;
+          party_name: string;
+          party_id: string;
+          inviter: {
+            userId: string;
+            username: string;
+          };
+          created_at: string;
+        }[] = await reqRes.json()
+        if (requestData.length > 0 && requestData[0].group_id) {
+          setUserOutgoingRequestGroupId(requestData[0].group_id || null)
+          setSearchedGroups((prev) =>
+            prev.map((g) => (g.group_id === requestData[0].group_id ? { ...g, requested_by_user: true } : g)),
+          )
+        } else {
+          setUserOutgoingRequestGroupId(null)
+        }
       }
     } catch (err: any) {
       console.error('Error fetching outgoing request:', err)
@@ -180,11 +192,10 @@ const JoinGroupScreen = () => {
     isLoaded,
     userId,
     partyId,
-    setError,
     setIsLoadingInvitations,
     setPendingInvitations,
     setUserOutgoingRequestGroupId,
-  ]) 
+  ])
 
   useEffect(() => {
     fetchData()
@@ -198,7 +209,7 @@ const JoinGroupScreen = () => {
     setIsProcessingAction(group_member_id)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE_URL}/group-members/${group_member_id}/respond`, {
+      const res = await fetch(`${API_BASE_URL}/group-member/${group_member_id}/respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ response }),
@@ -208,6 +219,9 @@ const JoinGroupScreen = () => {
           (await res.json().catch(() => ({}))).message || `Failed to ${response} invitation.`,
         )
       Alert.alert('Success', `Invitation ${response === 'accept' ? 'accepted' : 'decline'}d!`)
+      if (response === 'accept') {
+        router.replace(`/party/${partyId}/groups`);
+      }
       fetchData()
     } catch (err: any) {
       setError(err.message)
@@ -222,7 +236,7 @@ const JoinGroupScreen = () => {
     setIsProcessingAction(groupIdToRequest)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE_URL}/groups/${groupIdToRequest}/members/request`, {
+      const res = await fetch(`${API_BASE_URL}/group/${groupIdToRequest}/members/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId }),
@@ -237,7 +251,7 @@ const JoinGroupScreen = () => {
       )
     } catch (err: any) {
       setError(err.message)
-      Alert.alert('Error', err.message)
+      setTimeout(() => setError(null), 3000)
     } finally {
       setIsProcessingAction(null)
     }
@@ -264,7 +278,7 @@ const JoinGroupScreen = () => {
     return (
       <Animated.View style={[styles.invitationCard, animatedStyle]}>
         <Image
-          source={{ uri: `${API_BASE_URL}/user/${item.group_creator_user_id}/banner` }}
+          source={{ uri: `${API_BASE_URL}/user/${item.group_creator_user_id}/profile-picture` }}
           style={styles.leaderPhoto}
         />
         <View style={styles.invitationDetails}>
@@ -277,16 +291,7 @@ const JoinGroupScreen = () => {
           <Text style={styles.invitedByText} numberOfLines={1}>
             For: <Text style={{ fontWeight: 'bold' }}>{item.party_name}</Text>
           </Text>
-          <TouchableOpacity
-            onPress={() =>
-              Alert.alert(
-                'Group Details',
-                `More details for ${groupDisplayName} (ID: ${item.group_id}) coming soon.`,
-              )
-            }
-          >
-            <Text style={styles.viewLinkText}>view details</Text>
-          </TouchableOpacity>
+
         </View>
         <View style={styles.invitationActions}>
           <TouchableOpacity
@@ -350,7 +355,6 @@ const JoinGroupScreen = () => {
           <Text style={styles.groupMetaText} numberOfLines={1}>
             Leader: {item.creator_username}
           </Text>
-          <Text style={styles.groupMetaText}>Members:1/{item.max_members}</Text>
         </View>
         <TouchableOpacity
           style={[

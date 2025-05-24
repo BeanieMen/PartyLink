@@ -23,8 +23,10 @@ import {
   CheckCircle,
   Users,
   HelpCircle,
+  ShieldCheck, // Example icon for "Establish" button
 } from 'lucide-react-native'
 import Colors, { API_BASE_URL } from '@/constants'
+// Assuming GroupRow now includes 'established: boolean'
 import { GroupRow, QuestionRow, VoteRow, CommentRow } from '@/types/database'
 
 const AppColors = Colors.dark
@@ -33,20 +35,32 @@ const { width } = Dimensions.get('window')
 
 const memberItemWidth = (width - 40 - 30) / 2
 
+
 interface FrontendQuestion extends QuestionRow {
   votes: VoteRow[]
   my_vote?: VoteRow | null
   vote_counts?: { [voted_for_user_id: string]: number }
 }
 interface FrontendGroupDetails {
-  group: GroupRow
+  group: GroupRow; // Assuming GroupRow has 'established: boolean'
   members: {
     userId: string
+    status: string
     username?: string
+    pfp_url?: string;
   }[]
-  comments: CommentRow[]
+  comments: CommentRow[] & { username?: string }[]; // Adjusted for optimistic update
   questions: FrontendQuestion[]
 }
+
+interface FrontendCommentRow extends CommentRow { // For optimistic update with username
+  username?: string;
+}
+
+const editButtonIconSize = 22;
+const editButtonPaddingHorizontal = 12;
+const editButtonPaddingVertical = 8;
+const editButtonCalculatedWidth = editButtonIconSize + (editButtonPaddingHorizontal * 2);
 
 const GroupDetailsScreen: React.FC = () => {
   const { partyId } = useLocalSearchParams<{ partyId: string }>()
@@ -62,6 +76,7 @@ const GroupDetailsScreen: React.FC = () => {
   const [newComment, setNewComment] = useState('')
   const [isPostingComment, setIsPostingComment] = useState(false)
   const [isSubmittingVote, setIsSubmittingVote] = useState<string | null>(null)
+  const [isEstablishingGroup, setIsEstablishingGroup] = useState(false); // New state
 
   const [error, setError] = useState<string | null>(null)
 
@@ -70,53 +85,40 @@ const GroupDetailsScreen: React.FC = () => {
       setGroupDetails(null)
       return
     }
-
     setIsLoadingGroupDetails(true)
     setError(null)
-
     try {
-      const questionRes = await fetch(`${API_BASE_URL}/group/${userGroupId}/questions`)
-      if (!questionRes.ok) {
-        const errorData = await questionRes.json()
-        throw new Error(errorData.message || `Failed to fetch group details: ${questionRes.status}`)
-      }
+      const [questionRes, groupRes, commentRes, memberRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/group/${userGroupId}/questions`),
+        fetch(`${API_BASE_URL}/group/${userGroupId}`),
+        fetch(`${API_BASE_URL}/group/${userGroupId}/comments`),
+        fetch(`${API_BASE_URL}/group/${userGroupId}/members`),
+      ]);
+
+      if (!questionRes.ok) throw new Error(await questionRes.json().then(d => d.message).catch(() => `Failed to fetch questions: ${questionRes.status}`))
       const questionData: FrontendQuestion[] = await questionRes.json()
 
-      const groupRes = await fetch(`${API_BASE_URL}/group/${userGroupId}`)
-      if (!groupRes.ok) {
-        const errorData = await groupRes.json()
-        throw new Error(errorData.message || `Failed to fetch group details: ${groupRes.status}`)
-      }
+      if (!groupRes.ok) throw new Error(await groupRes.json().then(d => d.message).catch(() => `Failed to fetch group data: ${groupRes.status}`))
       const groupData: GroupRow = await groupRes.json()
 
-      const commentRes = await fetch(`${API_BASE_URL}/group/${userGroupId}/comments`)
-      if (!commentRes.ok) {
-        const errorData = await commentRes.json()
-        throw new Error(errorData.message || `Failed to fetch group details: ${commentRes.status}`)
-      }
+      if (!commentRes.ok) throw new Error(await commentRes.json().then(d => d.message).catch(() => `Failed to fetch comments: ${commentRes.status}`))
       const commentData: CommentRow[] = await commentRes.json()
 
-      const memberRes = await fetch(`${API_BASE_URL}/group/${userGroupId}/members`)
-      if (!memberRes.ok) {
-        const errorData = await memberRes.json()
-        throw new Error(errorData.message || `Failed to fetch group details: ${memberRes.status}`)
-      }
-      const memberData: { members: { userId: string; username?: string }[]; count?: number } =
-        await memberRes.json()
+      if (!memberRes.ok) throw new Error(await memberRes.json().then(d => d.message).catch(() => `Failed to fetch members: ${memberRes.status}`))
+      const memberData: { members: { userId: string; username?: string; pfp_url?: string; status: string }[]; count?: number } = await memberRes.json()
 
       const processedQuestions: FrontendQuestion[] = questionData.map((q) => {
-        const myVote = q.votes.find((v) => v.voter_user_id === userId)
+        const votesArray = Array.isArray(q.votes) ? q.votes : [];
+        const myVote = votesArray.find((v) => v.voter_user_id === userId)
         const voteCounts: { [voted_for_user_id: string]: number } = {}
-        q.votes.forEach((v) => {
-          voteCounts[v.voted_for_user_id] = (voteCounts[v.voted_for_user_id] || 0) + 1
-        })
-        return { ...q, my_vote: myVote || null, vote_counts: voteCounts }
+        votesArray.forEach((v) => { voteCounts[v.voted_for_user_id] = (voteCounts[v.voted_for_user_id] || 0) + 1 })
+        return { ...q, votes: votesArray, my_vote: myVote || null, vote_counts: voteCounts }
       })
 
       setGroupDetails({
         group: groupData,
-        members: memberData.members,
-        comments: commentData,
+        members: memberData.members.filter(member => member.status === "joined"),
+        comments: commentData.map(c => ({ ...c, username: memberData.members.find(m => m.userId === c.user_id)?.username || (c.user_id === userId ? "You" : "A member") })),
         questions: processedQuestions,
       })
     } catch (err) {
@@ -126,55 +128,45 @@ const GroupDetailsScreen: React.FC = () => {
     } finally {
       setIsLoadingGroupDetails(false)
     }
-  }, [userGroupId, userId, setIsLoadingGroupDetails, setError, setGroupDetails])  
+  }, [userGroupId, userId])
 
   useEffect(() => {
     const findUserGroup = async () => {
       if (!authLoaded || !userId || !partyId) {
         if (authLoaded && !userId) setError('User not authenticated.')
         if (!partyId) setError('Party context is missing.')
-        setIsLoadingGroupStatus(false)
-        return
+        setIsLoadingGroupStatus(false); return;
       }
-      setIsLoadingGroupStatus(true)
-      setError(null)
-
+      setIsLoadingGroupStatus(true); setError(null);
       try {
         const response = await fetch(`${API_BASE_URL}/user/${userId}/party/${partyId}/group`)
-
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(
-            errorData.message || `Failed to find user's group status: ${response.status}`,
-          )
-        }
-
-        const data: GroupRow & { status: string } = await response.json()
-
-        if (data.group_id && data.status === 'joined') {
-          setUserGroupId(data.group_id)
-          setIsLoadingGroupDetails(false)
+          if (response.status === 404) {
+            setUserGroupId(null); setError('You are not currently in a group for this party.')
+          } else {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.message || `Failed to find user's group status: ${response.status}`)
+          }
         } else {
-          setUserGroupId(null)
-          setError('You are not currently in a group for this party.')
-          setIsLoadingGroupDetails(false)
+          const data: GroupRow & { status?: string } = await response.json()
+          if (data.group_id) { setUserGroupId(data.group_id) }
+          else { setUserGroupId(null); setError('You are not currently in a group for this party.') }
         }
       } catch (err) {
         console.error('Find User Group Error:', err)
         setError(err instanceof Error ? err.message : 'Could not determine your group.')
         setUserGroupId(null)
-        setIsLoadingGroupDetails(false)
       } finally {
         setIsLoadingGroupStatus(false)
       }
     }
-
     findUserGroup()
   }, [authLoaded, userId, partyId])
 
   useEffect(() => {
-    fetchGroupDetails()
-  }, [userGroupId, userId, fetchGroupDetails])
+    if (userGroupId) { fetchGroupDetails() }
+    else { setGroupDetails(null) }
+  }, [userGroupId, fetchGroupDetails])
 
   const handlePostComment = async () => {
     if (newComment.trim() === '' || !userGroupId || !userId) return
@@ -185,20 +177,15 @@ const GroupDetailsScreen: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment_text: newComment, user_id: userId }),
       })
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Failed to post comment.')
-      }
+      if (!response.ok) throw new Error(await response.json().then(d => d.message).catch(() => 'Failed to post comment.'))
       setNewComment('')
       const newCommentData: CommentRow = await response.json()
-
-      if (groupDetails) {
-        setGroupDetails((prevDetails) => {
-          if (!prevDetails) return null
-          const updatedComments = [newCommentData, ...prevDetails.comments]
-          return { ...prevDetails, comments: updatedComments }
-        })
-      }
+      setGroupDetails((prevDetails) => {
+        if (!prevDetails) return null;
+        const commenter = prevDetails.members.find(m => m.userId === newCommentData.user_id);
+        const commentWithUsername: FrontendCommentRow = { ...newCommentData, username: commenter?.username || (userId === newCommentData.user_id ? 'You' : 'A member') };
+        return { ...prevDetails, comments: [commentWithUsername, ...prevDetails.comments] };
+      });
     } catch (err) {
       console.error('Post Comment Error:', err)
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not post comment.')
@@ -211,84 +198,129 @@ const GroupDetailsScreen: React.FC = () => {
     if (!userGroupId || !userId || isSubmittingVote) return
     setIsSubmittingVote(questionId)
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/group/${userGroupId}/questions/${questionId}/vote`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ voted_for_user_id: votedForUserId, voter_user_id: userId }),
-        },
-      )
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Failed to submit vote.')
-      }
+      const response = await fetch(`${API_BASE_URL}/group/${userGroupId}/questions/${questionId}/vote`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voted_for_user_id: votedForUserId, voter_user_id: userId }),
+      })
+      if (!response.ok) throw new Error(await response.json().then(d => d.message).catch(() => 'Failed to submit vote.'))
       fetchGroupDetails()
     } catch (err) {
-      console.error('Vote Error:', err)
+      console.error('Vote Error:', err);
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not submit vote.')
     } finally {
       setIsSubmittingVote(null)
     }
   }
 
-  if (isLoadingGroupStatus || (userGroupId && isLoadingGroupDetails)) {
+  // New function to handle establishing the group
+  const handleEstablishGroup = async () => {
+    if (!userGroupId || !isCreator || groupDetails?.group.established) { // Check established status
+      Alert.alert("Info", "This group cannot be established at this time or is already established.");
+      return;
+    }
+    setIsEstablishingGroup(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/group/${userGroupId}/establish`, {
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to establish group. Unknown error.' }));
+        throw new Error(errorData.message);
+      }
+      Alert.alert("Success", "Group established!");
+      fetchGroupDetails(); // Refresh details to update UI (e.g., hide button)
+    } catch (err) {
+      console.error('Establish Group Error:', err);
+      Alert.alert('Error', err instanceof Error ? err.message : 'Could not establish group.');
+    } finally {
+      setIsEstablishingGroup(false);
+    }
+  };
+
+
+  // --- Loading and Error States ---
+  if (isLoadingGroupStatus || (!authLoaded && !userId)) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color={AppColors.white} />
-        <Text style={styles.loaderText}>
-          {isLoadingGroupStatus ? 'Finding your group...' : 'Loading Group Details...'}
-        </Text>
+        <Text style={styles.loaderText}>{!authLoaded ? "Authenticating..." : "Finding your group..."}</Text>
       </View>
-    )
+    );
   }
 
-  if (error && !userGroupId) {
+  if (authLoaded && userId && !userGroupId && !isLoadingGroupStatus) {
     return (
       <View style={styles.loaderContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Go Back</Text>
+        <Text style={styles.errorText}>{error || 'You are not currently in a group for this party.'}</Text>
+        <TouchableOpacity onPress={() => router.replace(partyId ? `/party/${partyId}` : '/dashboard')} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Back to Party</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (userGroupId && isLoadingGroupDetails) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color={AppColors.white} />
+        <Text style={styles.loaderText}>Loading Group Details...</Text>
+      </View>
+    );
+  }
+
+  if (userGroupId && !isLoadingGroupDetails && (error || !groupDetails)) {
+    return (
+      <View style={styles.loaderContainer}>
+        <Text style={styles.errorText}>{error || 'Group details could not be loaded. The group might no longer exist or there was an issue.'}</Text>
+        <TouchableOpacity onPress={fetchGroupDetails} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.replace(partyId ? `/party/${partyId}` : '/dashboard')} style={[styles.primaryButton, { backgroundColor: AppColors.inputBg, marginTop: 10 }]}>
+          <Text style={styles.primaryButtonText}>Back to Party</Text>
         </TouchableOpacity>
       </View>
     )
   }
 
-  if (!groupDetails) {
+  if (!groupDetails || !userGroupId) { // Should be caught by above, but as a final safeguard
     return (
       <View style={styles.loaderContainer}>
-        <Text style={styles.errorText}>Could not load group details after finding your group.</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Go Back</Text>
+        <Text style={styles.errorText}>Unable to display group details. Please ensure you are part of an active group.</Text>
+        <TouchableOpacity onPress={() => router.replace(partyId ? `/party/${partyId}` : '/dashboard')} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Back to Party</Text>
         </TouchableOpacity>
       </View>
-    )
+    );
   }
+  // --- End Loading and Error States ---
 
-  const isCreator = userId === groupDetails.group.creator_user_id
+  const isCreator = userId === groupDetails.group.creator_user_id;
+  const editButtonIconSize = 22;
+  const editButtonPaddingHorizontal = 12;
+  const editButtonPaddingVertical = 8;
+  const editButtonCalculatedWidth = editButtonIconSize + (editButtonPaddingHorizontal * 2);
 
-  const renderMemberItem = ({ item }: { item: { userId: string; username?: string } }) => (
+  const renderMemberItem = ({ item }: { item: FrontendGroupDetails['members'][0] }) => (
     <View style={styles.memberItem}>
       <Image
-        source={{ uri: `${API_BASE_URL}/user/${item.userId}/profile-picture` }}
+        source={{ uri: item.pfp_url || `${API_BASE_URL}/user/${item.userId}/profile-picture` }}
         style={styles.memberPfp}
       />
       <Text style={styles.memberUsername} numberOfLines={1}>
-        {item.username}
+        {item.username || 'User...'}
       </Text>
     </View>
   )
 
-  const renderCommentItem = ({ item }: { item: CommentRow & { username?: string } }) => (
+  const renderCommentItem = ({ item }: { item: FrontendCommentRow }) => (
     <View style={styles.commentItem}>
       <Image
-        source={{ uri: `${API_BASE_URL}/user/${item.user_id}/profile-picture` }}
+        source={{ uri: `${API_BASE_URL}/user/${item.user_id}/profile-picture` }} // Assuming comments have user_id
         style={styles.commenterPfp}
       />
       <View style={styles.commentContent}>
-        <Text style={styles.commenterUsername}>{item.username}</Text>
+        <Text style={styles.commenterUsername}>{item.username || 'A member'}</Text>
         <Text style={styles.commentText}>{item.comment_text}</Text>
-        <Text style={styles.commentTimestamp}>{new Date(item.created_at).toLocaleString()}</Text>
+        <Text style={styles.commentTimestamp}>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text>
       </View>
     </View>
   )
@@ -303,29 +335,29 @@ const GroupDetailsScreen: React.FC = () => {
             style={[
               styles.voteOptionButton,
               question.my_vote?.voted_for_user_id === member.userId && styles.myVoteOption,
-              isSubmittingVote === question.question_id && styles.disabledButton,
+              (isSubmittingVote === question.question_id) && styles.disabledButton,
             ]}
             onPress={() => handleVote(question.question_id, member.userId)}
-            disabled={isSubmittingVote === question.question_id}
+            disabled={isSubmittingVote === question.question_id || !!question.my_vote}
           >
             <Image
-              source={{ uri: `${API_BASE_URL}/user/${member.userId}/profile-picture` }}
+              source={{ uri: member.pfp_url || `${API_BASE_URL}/user/${member.userId}/profile-picture` }}
               style={styles.voteOptionPfp}
             />
             <Text style={styles.voteOptionText} numberOfLines={1}>
-              {member.username}
+              {member.username || 'User...'}
             </Text>
             {question.my_vote?.voted_for_user_id === member.userId && (
-              <CheckCircle size={16} color={AppColors.yellow400} style={styles.myVoteIcon} />
+              <CheckCircle size={18} color={AppColors.yellow400} style={styles.myVoteIcon} />
             )}
             <Text style={styles.voteCountText}>
-              Votes: {question.vote_counts?.[member.userId] || 0}
+              {question.vote_counts?.[member.userId] || 0}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
       {isSubmittingVote === question.question_id && (
-        <ActivityIndicator size="small" color={AppColors.primary} style={{ marginTop: 5 }} />
+        <ActivityIndicator size="small" color={AppColors.primary} style={{ marginTop: 8 }} />
       )}
     </View>
   )
@@ -341,29 +373,27 @@ const GroupDetailsScreen: React.FC = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color={AppColors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{`Group by ${groupDetails.group.creator_username}`}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {`Group by ${groupDetails.group.creator_username || 'Creator'}`}
+        </Text>
         {isCreator ? (
           <TouchableOpacity
             style={styles.editButton}
-            onPress={() =>
-              router.push({
-                pathname: '/party/[partyId]/groups/edit',
-                params: { partyId: partyId },
-              })
-            }
+            onPress={() => router.push(partyId && userGroupId ? `/party/${partyId}/groups/edit?groupId=${userGroupId}` : '/dashboard')}
           >
-            <Edit3 size={22} color={AppColors.primary} />
+            <Edit3 size={editButtonIconSize} color={AppColors.white} />
           </TouchableOpacity>
         ) : (
-          <View style={{ width: 24 }} />
+          <View style={{ width: editButtonCalculatedWidth }} />
         )}
       </View>
+
 
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeader}>
           <Users size={20} color={AppColors.primary} />
           <Text style={styles.sectionTitle}>
-            Group Members ({groupDetails.members.length}/{groupDetails.group.max_members})
+            Group Members ({groupDetails.members.length})
           </Text>
         </View>
         {groupDetails.members.length > 0 ? (
@@ -373,7 +403,7 @@ const GroupDetailsScreen: React.FC = () => {
             keyExtractor={(item) => item.userId}
             numColumns={2}
             columnWrapperStyle={styles.membersRow}
-            scrollEnabled={false}
+            scrollEnabled={false} // Important if inside a ScrollView
           />
         ) : (
           <Text style={styles.emptyStateText}>No members have joined yet.</Text>
@@ -388,13 +418,8 @@ const GroupDetailsScreen: React.FC = () => {
         <FlatList
           data={[...groupDetails.comments]
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .map((comment) => {
-              return {
-                ...comment,
-                username: groupDetails.members.find((member) => member.userId === comment.user_id)
-                  ?.username,
-              }
-            })}
+            // Username mapping is now done in fetchGroupDetails or optimistic update
+          }
           renderItem={renderCommentItem}
           keyExtractor={(item) => item.comment_id}
           style={styles.commentsList}
@@ -445,6 +470,26 @@ const GroupDetailsScreen: React.FC = () => {
           />
         </View>
       )}
+
+      {/* Establish Group Button Section */}
+      {isCreator && groupDetails.group.established === 0 && (
+        <View style={styles.establishButtonContainer}>
+          <TouchableOpacity
+            style={[styles.establishGroupButton, isEstablishingGroup && styles.disabledButton]}
+            onPress={handleEstablishGroup}
+            disabled={isEstablishingGroup}
+          >
+            {isEstablishingGroup ? (
+              <ActivityIndicator size="small" color={AppColors.white} />
+            ) : (
+              <>
+                <ShieldCheck size={20} color={AppColors.white} style={{ marginRight: 8 }} />
+                <Text style={styles.establishGroupButtonText}>Establish Group</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   )
 }
@@ -475,6 +520,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginVertical: 20,
     paddingHorizontal: 20,
+    lineHeight: 22,
   },
   primaryButton: {
     backgroundColor: AppColors.primary,
@@ -483,6 +529,8 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     alignItems: 'center',
     marginTop: 20,
+    minWidth: width * 0.6,
+    alignSelf: 'center',
   },
   primaryButtonText: {
     color: AppColors.white,
@@ -494,24 +542,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 15,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'android' ? 40 : 50,
+    paddingVertical: 10,
+    paddingTop: Platform.OS === 'android' ? 35 : 50,
+    backgroundColor: AppColors.cardBg,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: AppColors.inputBg,
   },
   backButton: {
-    padding: 5,
+    padding: 8,
+    marginRight: 5,
+    zIndex: 1,
   },
   headerTitle: {
     color: AppColors.white,
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     textAlign: 'center',
-    flex: 1,
+    flexShrink: 1,
     marginHorizontal: 5,
   },
   editButton: {
-    padding: 5,
+    backgroundColor: AppColors.primary,
+    paddingHorizontal: editButtonPaddingHorizontal,
+    paddingVertical: editButtonPaddingVertical,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 5,
+    minWidth: editButtonCalculatedWidth,
+    height: editButtonIconSize + (editButtonPaddingVertical * 2),
+  },
+  establishedStatusContainer: { // Optional: Style for showing established status
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    backgroundColor: AppColors.tertiaryBg || AppColors.inputBg, // A slightly different background
+    alignItems: 'center',
+    marginVertical: 10,
+    marginHorizontal: 15,
+    borderRadius: 8,
+  },
+  establishedStatusText: {
+    color: AppColors.gray200,
+    fontSize: 14,
+    fontWeight: '500',
   },
   sectionContainer: {
     marginTop: 20,
@@ -524,12 +597,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 15,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.inputBg,
   },
   sectionTitle: {
     color: AppColors.white,
     fontSize: 18,
     fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: 10,
   },
   membersRow: {
     justifyContent: 'space-between',
@@ -538,15 +614,16 @@ const styles = StyleSheet.create({
     width: memberItemWidth,
     alignItems: 'center',
     marginBottom: 15,
-    padding: 5,
+    paddingHorizontal: 5,
   },
   memberPfp: {
-    width: memberItemWidth * 0.6,
-    height: memberItemWidth * 0.6,
-    borderRadius: (memberItemWidth * 0.6) / 2,
+    width: memberItemWidth * 0.55,
+    height: memberItemWidth * 0.55,
+    borderRadius: (memberItemWidth * 0.55) / 2,
     marginBottom: 8,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: AppColors.primary,
+    backgroundColor: AppColors.inputBg,
   },
   memberUsername: {
     color: AppColors.gray300,
@@ -554,20 +631,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   commentsList: {
-    maxHeight: 300,
     marginBottom: 10,
   },
   commentItem: {
     flexDirection: 'row',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: AppColors.inputBg,
   },
   commenterPfp: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    marginRight: 12,
+    backgroundColor: AppColors.inputBg,
   },
   commentContent: {
     flex: 1,
@@ -575,17 +652,18 @@ const styles = StyleSheet.create({
   commenterUsername: {
     color: AppColors.white,
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 14.5,
   },
   commentText: {
-    color: AppColors.gray300,
+    color: AppColors.gray200,
     fontSize: 14,
-    marginTop: 2,
+    marginTop: 3,
+    lineHeight: 19,
   },
   commentTimestamp: {
     color: AppColors.textGray,
-    fontSize: 10,
-    marginTop: 4,
+    fontSize: 11,
+    marginTop: 5,
     textAlign: 'right',
   },
   commentInputContainer: {
@@ -600,82 +678,118 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: AppColors.inputBg,
     color: AppColors.white,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    borderRadius: 22,
     fontSize: 15,
     marginRight: 10,
     maxHeight: 100,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: AppColors.inputBg,
   },
   postCommentButton: {
     backgroundColor: AppColors.primary,
-    padding: 10,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 40,
-    height: 40,
   },
   questionCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 10,
+    padding: 15,
     marginBottom: 15,
+    borderWidth: 1,
+    borderColor: AppColors.inputBg,
   },
   questionText: {
     color: AppColors.white,
-    fontSize: 16,
+    fontSize: 16.5,
     fontWeight: '500',
-    marginBottom: 12,
+    marginBottom: 15,
     textAlign: 'center',
+    lineHeight: 22,
   },
-  voteOptionsContainer: {},
+  voteOptionsContainer: {
+    // Container for vote options
+  },
   voteOptionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: AppColors.inputBg,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    marginBottom: 8,
-    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1.5,
     borderColor: 'transparent',
+    minHeight: 48,
   },
   myVoteOption: {
     borderColor: AppColors.yellow400,
-    backgroundColor: 'rgba(250, 204, 21, 0.1)',
+    backgroundColor: 'rgba(250, 204, 21, 0.15)',
   },
   voteOptionPfp: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginRight: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 10,
+    backgroundColor: AppColors.gray500,
   },
   voteOptionText: {
-    color: AppColors.gray300,
-    fontSize: 14,
+    color: AppColors.gray100,
+    fontSize: 14.5,
     flex: 1,
   },
   myVoteIcon: {
-    marginLeft: 5,
+    marginLeft: 8,
   },
   voteCountText: {
-    color: AppColors.textGray,
-    fontSize: 12,
+    color: AppColors.gray300,
+    fontSize: 13,
+    fontWeight: '500',
     marginLeft: 'auto',
     paddingLeft: 10,
   },
-  disabledButton: {
+  disabledButton: { // Make sure this is defined for disabled states
     opacity: 0.6,
   },
   emptyStateText: {
     color: AppColors.textGray,
     textAlign: 'center',
-    marginVertical: 15,
-    fontSize: 14,
+    marginVertical: 20,
+    fontSize: 14.5,
     fontStyle: 'italic',
+    paddingHorizontal: 10,
+  },
+  // New Styles for Establish Group Button
+  establishButtonContainer: {
+    marginTop: 30, // Increased top margin for separation
+    marginBottom: 20, // Margin at the bottom of the scroll content
+    marginHorizontal: 15,
+    alignItems: 'center',
+  },
+  establishGroupButton: {
+    backgroundColor: AppColors.green500 || AppColors.primary, // Use green or fallback to primary
+    flexDirection: 'row', // To align icon and text
+    paddingVertical: 14,
+    paddingHorizontal: 25, // Generous padding
+    borderRadius: 28, // Fully rounded ends
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: width * 0.75, // Make it a prominent button
+    shadowColor: AppColors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  establishGroupButtonText: {
+    color: AppColors.white,
+    fontSize: 17, // Slightly larger text
+    fontWeight: 'bold',
+    marginLeft: 8, // If icon is present
   },
 })
 

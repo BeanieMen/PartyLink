@@ -1,9 +1,8 @@
 export interface UserRow {
   user_id: string
   username: string
-  pfp_url: string | null
   description: string | null
-  instagram_link: string | null
+  socials: string | null
   is_private: number
   created_at: string
   updated_at: string
@@ -45,13 +44,14 @@ export interface TicketRow {
 }
 
 export interface GroupRow {
-  group_id: string
-  party_id: string
-  creator_user_id: string
-  creator_username: string
-  max_members: number
-  created_at: string
-  updated_at: string
+  group_id: string;
+  party_id: string;
+  creator_user_id: string;
+  creator_username: string;
+  max_members: number;
+  established: number; // 0 or 1
+  created_at: string;
+  updated_at: string;
 }
 
 export interface GroupMemberRow {
@@ -90,19 +90,13 @@ export interface CommentRow {
   updated_at: string
 }
 
-export interface ChatRequestRow {
-  chat_request_id: string
-  requester_user_id: string
-  receiver_user_id: string
-  status: 'pending' | 'accepted' | 'declined'
-  created_at: string
-  updated_at: string
-}
+
 
 export interface ChatSessionRow {
   chat_session_id: string
-  user1_id: string
-  user2_id: string
+  user1_id: string // requester
+  user2_id: string // requestee
+  status: 'pending' | 'accepted' | 'declined'
   created_at: string
   updated_at: string
 }
@@ -112,8 +106,6 @@ export interface MessageRow {
   chat_session_id: string
   sender_user_id: string
   content: string
-  is_read: number
-  read_at: string | null
   created_at: string
 }
 
@@ -130,8 +122,6 @@ export interface GroupMessageRow {
   group_chat_id: string
   sender_user_id: string
   content: string
-  is_read: number
-  read_at: string | null
   created_at: string
 }
 
@@ -140,4 +130,10 @@ export interface GroupDislikeRow {
   user_id: string;
   group_id: string;
   created_at: string;
+}
+
+export interface FrontendQuestion extends QuestionRow {
+  votes: VoteRow[];
+  my_vote?: VoteRow | null;
+  vote_counts?: { [voted_for_user_id: string]: number };
 }

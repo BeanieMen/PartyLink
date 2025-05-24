@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,107 +11,169 @@ import {
   Dimensions,
   Platform,
   Alert,
-} from 'react-native'
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router'
-import { useAuth, useUser } from '@clerk/clerk-expo'
-import { ArrowLeft, CalendarDays, MapPin, Clock } from 'lucide-react-native'
-import QRCodeSVG from 'react-native-qrcode-svg'
-import Colors, { API_BASE_URL } from '@/constants'
-import { PartyRow, UserRow, GroupRow } from '@/types/database'
+} from 'react-native';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useAuth, useUser } from '@clerk/clerk-expo';
+import { ArrowLeft, CalendarDays, MapPin, Clock } from 'lucide-react-native';
+import QRCodeSVG from 'react-native-qrcode-svg';
+import Colors, { API_BASE_URL } from '@/constants';
+import { PartyRow, UserRow, GroupRow, GroupMemberRow } from '@/types/database';
 
-const AppColors = Colors.dark
-const { width: screenWidth } = Dimensions.get('window')
+const AppColors = Colors.dark;
+const { width: screenWidth } = Dimensions.get('window');
+
+// Add type for the group members API response structure
+interface GroupMembersApiResponse {
+  members: { userId: string; username?: string; status: string; }[];
+  count?: number;
+}
 
 const PartyLandingScreen: React.FC = () => {
-  const { partyId } = useLocalSearchParams<{ partyId: string }>()
-  const router = useRouter()
-  const [party, setParty] = useState<PartyRow | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [qrValue, setQrValue] = useState('')
-  const [showQR, setShowQR] = useState(false)
-  const { isSignedIn, isLoaded: userLoaded } = useUser()
-  const { userId, isLoaded: authLoaded } = useAuth()
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false)
-  const [currentUser, setCurrentUser] = useState<UserRow | null>(null)
-  const [userGroup, setUserGroup] = useState<GroupRow | undefined>(undefined)
-  const [checkingGroup, setCheckingGroup] = useState(true)
+  const { partyId } = useLocalSearchParams<{ partyId: string }>();
+  const router = useRouter();
+
+  const [party, setParty] = useState<PartyRow | null>(null);
+  const [loading, setLoading] = useState<boolean>(true); // Overall loading state
+  const [qrValue, setQrValue] = useState<string>('');
+  const [showQR, setShowQR] = useState<boolean>(false);
+
+  const { userId, isLoaded: authLoaded } = useAuth();
+
+  const [isCreatingGroup, setIsCreatingGroup] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<UserRow | null>(null);
+  const [userGroup, setUserGroup] = useState<GroupRow | undefined>(undefined); // undefined if not in a group, object if in a group
+  const [checkingGroup, setCheckingGroup] = useState<boolean>(false); // Specific state for checking group status
+  const [groupStatus, setGroupStatus] = useState<string | null>(null); // Status within the group (e.g., 'joined', 'invited')
+  // You might want a general error state here as well, e.g., const [error, setError] = useState<string | null>(null);
+
+  // Combined data fetching function
+  const fetchPartyAndUserData = useCallback(async () => {
+    if (!partyId) {
+      setLoading(false);
+      console.error('Party ID is missing');
+      // Optionally set an error state
+      // setError('Party ID is missing.');
+      return;
+    }
+
+    // Wait for auth and user data to be loaded before proceeding with fetches that depend on them
+    if (!authLoaded) {
+      console.log("Waiting for auth/user loaded...");
+      // Keep loading true until auth is ready
+      setLoading(true);
+      return; // Exit and useEffect will re-run when dependencies change
+    }
+
+    setLoading(true); // Start overall loading
+    setCheckingGroup(true); // Indicate that group status is being checked (part of initial load)
+    // setError(null); // Clear any previous errors
+
+    try {
+      // 1. Fetch Party Details
+      const partyResponse = await fetch(`${API_BASE_URL}/party/${partyId}`);
+      if (!partyResponse.ok) {
+        // Even if party fetch fails, attempt to fetch user/group info if signed in
+        console.error(`Failed to fetch party: ${partyResponse.status}`);
+        // Optionally set a party-specific error: setPartyError(`Could not load party details: ${partyResponse.status}`);
+        setParty(null); // Set party to null on failure
+      } else {
+        const partyData: PartyRow = await partyResponse.json();
+
+        setParty(partyData);
+      }
+
+      // 2. Fetch User-Specific Data (only if signed in)
+      if (userId) {
+        // Use Promise.all for fetches that can happen concurrently
+        const [userResponse, userGroupResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/user/${userId}`),
+          fetch(`${API_BASE_URL}/user/${userId}/party/${partyId}/group`)
+        ]);
+
+        // Handle User Details Response
+        if (!userResponse.ok) {
+          console.warn(`User ${userId} not found in DB, proceeding without user details.`);
+          setCurrentUser(null);
+        } else {
+          const userData: UserRow = await userResponse.json();
+          setCurrentUser(userData);
+        }
+
+        // Handle User Group Details and Status Response
+        if (userGroupResponse.status === 404) {
+          // User is not part of any group for this party
+          setUserGroup(undefined);
+          setGroupStatus(null);
+        } else if (!userGroupResponse.ok) {
+          console.error(`Failed to fetch user group: ${userGroupResponse.status}`);
+          // Optionally set a group-specific error: setUserGroupError(...)
+          setUserGroup(undefined); // Ensure userGroup is undefined on error
+          setGroupStatus(null); // Cannot determine status on error
+        } else {
+          const groupData: GroupRow = await userGroupResponse.json();
+          setUserGroup(groupData);
+
+          // If group data is successfully fetched, get the user's status within that group
+          if (groupData?.group_id) { // Check if group_id is available
+            const membersResponse = await fetch(`${API_BASE_URL}/group/${groupData.group_id}/members`);
+            if (!membersResponse.ok) {
+              console.error(`Failed to fetch group member status: ${membersResponse.status}`);
+              // Optionally set a group status error: setGroupStatusError(...)
+              setGroupStatus(null); // Cannot determine status on error
+            } else {
+              const membersData: GroupMembersApiResponse = await membersResponse.json();
+              // Find the current user's status in the members list
+              const status = membersData.members.find(member => member.userId === userId)?.status;
+              setGroupStatus(status || null); // Set the found status or null if not found
+            }
+          } else {
+            // Group data was fetched, but group_id is missing - should not happen if response is ok
+            console.warn("Fetched group data but group_id is missing.");
+            setGroupStatus(null);
+          }
+        }
+
+      } else {
+        // User is not signed in, clear user-specific states
+        setCurrentUser(null);
+        setUserGroup(undefined);
+        setGroupStatus(null);
+      }
+      setLoading(false)
+      setCheckingGroup(false)
+    } catch (error) {
+      console.error("Error fetching party and user data:", error);
+      setLoading(false);
+      setCheckingGroup(false);
+
+      
+
+    } finally {
+      // Turn off loading states after all fetch operations have attempted to complete
+      setCheckingGroup(false); // Finished checking group status
+      setLoading(false); // Finished overall loading
+    }
+  }, [partyId,  authLoaded, userId]); // Dependencies for useCallback
 
   useEffect(() => {
-    if (!partyId) {
-      setLoading(false)
-      console.error('Party ID is missing')
-      return
+    fetchPartyAndUserData();
+  }, [fetchPartyAndUserData]); 
+
+  const handleTicket = (): void => {
+    if (!partyId) return;
+    // Fallback userIdPart to 'guest' or 'unknown' if not signed in
+    const userIdPart: string = currentUser?.user_id || (userId ? userId : 'guest');
+    const code: string = `${partyId}-${userIdPart}`;
+    setQrValue(code);
+    setShowQR(true);
+  };
+
+  const handleCreateGroup = async (): Promise<void> => {
+    if (  !userId || !partyId || !currentUser) {
+      Alert.alert('Error', 'You must be signed in and user data loaded to create a group.');
+      return;
     }
-
-    if (!userLoaded || !authLoaded) {
-      return
-    }
-
-    fetch(`${API_BASE_URL}/party/${partyId}`)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Failed to fetch party: ${res.status}`)
-        }
-        return res.json()
-      })
-      .then((data) => {
-        setParty(data)
-      })
-      .catch(console.error)
-
-    if (isSignedIn && userId) {
-      fetch(`${API_BASE_URL}/user/${userId}`)
-        .then((res) => {
-          if (!res.ok) {
-            console.warn(`User ${userId} not found in DB, proceeding without user details.`)
-            return null
-          }
-          return res.json()
-        })
-        .then((data: UserRow | null) => {
-          setCurrentUser(data)
-        })
-        .catch(console.error)
-
-      setCheckingGroup(true)
-      fetch(`${API_BASE_URL}/user/${userId}/party/${partyId}/group`)
-        .then((res) => {
-          if (res.status === 404) {
-            return null
-          }
-          if (!res.ok) {
-            throw new Error(`Failed to fetch user group: ${res.status}`)
-          }
-          return res.json()
-        })
-        .then((data: GroupRow | undefined) => {
-          setUserGroup(data)
-        })
-        .catch(console.error)
-        .finally(() => {
-          setCheckingGroup(false)
-          setLoading(false)
-        })
-    } else {
-      setCheckingGroup(false)
-      setLoading(false)
-    }
-  }, [partyId, userLoaded, authLoaded, userId, isSignedIn])
-
-  const handleTicket = () => {
-    if (!partyId) return
-    const userIdPart = currentUser?.user_id || (isSignedIn ? userId : 'guest')
-    const code = `${partyId}-${userIdPart}`
-    setQrValue(code)
-    setShowQR(true)
-  }
-
-  const handleCreateGroup = async () => {
-    if (!isSignedIn || !userId || !partyId || !currentUser) {
-      Alert.alert('Error', 'You must be signed in and user data loaded to create a group.')
-      return
-    }
-    setIsCreatingGroup(true)
+    setIsCreatingGroup(true);
     try {
       const response = await fetch(`${API_BASE_URL}/party/${partyId}/groups`, {
         method: 'POST',
@@ -120,64 +182,93 @@ const PartyLandingScreen: React.FC = () => {
         },
         body: JSON.stringify({
           creator_user_id: userId,
-          creator_username: currentUser.username,
+          creator_username: currentUser.username, // Use currentUser's username
         }),
-      })
+      });
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || `Failed to create group: ${response.status}`)
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to create group: ${response.status}`);
       }
 
-      const newGroup = await response.json()
+      const newGroup: GroupRow = await response.json();
 
       if (newGroup && newGroup.group_id) {
-        router.replace(`/party/${partyId}/groups`)
+        // Refresh data to show user is now in a group, then navigate
+        // Calling fetchPartyAndUserData will update the state including userGroup and groupStatus
+        await fetchPartyAndUserData();
+        // Navigate after state is updated and reflects the new group membership
+        // Use replace if creating group is the end of this flow before going to the group
+        router.replace(`/party/${partyId}/groups/edit`);
       } else {
-        throw new Error('Group ID not returned from API.')
+        throw new Error('Group ID not returned from API.');
       }
     } catch (error) {
-      console.error('Create Group Error:', error)
+      console.error('Create Group Error:', error);
       Alert.alert(
         'Error Creating Group',
         error instanceof Error ? error.message : 'An unexpected error occurred.',
-      )
+      );
     } finally {
-      setIsCreatingGroup(false)
+      setIsCreatingGroup(false);
     }
-  }
+  };
 
-  const handleViewYourGroup = () => {
-    if (userGroup?.group_id) {
-      router.push(`/party/${partyId}/groups`)
+  const handleViewYourGroup = (): void => {
+    // Navigate to the general groups page for this party, which should then show the user's group
+    if (partyId) {
+      router.push(`/party/${partyId}/groups`);
     } else {
-      Alert.alert('Error', 'Could not find your group details.')
+      Alert.alert('Error', 'Party context is missing.');
     }
-  }
+    // Note: Navigating directly to a specific group ID route like `/party/${partyId}/groups/${userGroup.group_id}`
+    // might be more direct if that route exists and can handle it. The current `/party/${partyId}/groups`
+    // route seems designed to show the user's group if they are in one, or the join/create options.
+  };
 
-  const handleExploreScene = () => {
-    router.push(`/party/${partyId}/groups/explore`)
-  }
 
-  if (loading || checkingGroup) {
+  const handleExploreScene = (): void => {
+    if (partyId) { // Ensure partyId is available for navigation
+      router.push(`/party/${partyId}/groups/explore`);
+    } else {
+      Alert.alert('Error', 'Party context is missing.');
+    }
+  };
+
+  // Conditional rendering based on loading states
+  // Show loading if overall loading or checking group status is in progress
+  // Also check if partyId is missing, which is an initial error state
+  if (loading || checkingGroup || !partyId && !party) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color={AppColors.white} />
-        <Text style={styles.loaderText}>Loading party details...</Text>
+        <Text style={styles.loaderText}>
+          {!partyId ? 'Party ID Missing...' :
+            !authLoaded ? 'Authenticating...' :
+              checkingGroup ? 'Checking group status...' :
+                'Loading party details...'}
+        </Text>
       </View>
-    )
+    );
   }
 
+  // If not loading, and party is null, it means fetching failed or party not found
   if (!party) {
     return (
       <View style={styles.loaderContainer}>
-        <Text style={styles.errorText}>Party details could not be loaded.</Text>
+        {/* You could add a specific error icon here */}
+        {/* <LucideAlertCircle size={48} color={AppColors.white} /> */}
+        <Text style={styles.errorText}>Party details could not be loaded or party not found.</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButtonContainerError}>
           <ArrowLeft size={20} color={AppColors.white} />
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
+        {/* Optionally add a retry button for the fetchPartyAndUserData */}
+        {/* <TouchableOpacity onPress={fetchPartyAndUserData} style={styles.primaryButton}>
+             <Text style={styles.primaryButtonText}>Try Again</Text>
+         </TouchableOpacity> */}
       </View>
-    )
+    );
   }
 
   return (
@@ -190,7 +281,8 @@ const PartyLandingScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {isSignedIn && userId && currentUser && (
+      {/* Render profile header only if signed in and user data is available */}
+      {userId && currentUser && (
         <View style={styles.profileHeader}>
           <View style={styles.userButtonWrapper}>
             <Image
@@ -202,6 +294,7 @@ const PartyLandingScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Event Summary Card */}
       <View style={styles.eventSummaryCard}>
         <View style={styles.eventDetails}>
           <Text style={styles.eventName}>{party.name.toUpperCase()}</Text>
@@ -229,53 +322,84 @@ const PartyLandingScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Call to Action (CTA) Container based on user's group status */}
       <View style={styles.ctaContainer}>
-        {userGroup ? (
-          <>
-            <Text style={styles.ctaText}>You are already part of a group for this party!</Text>
-            <TouchableOpacity style={styles.primaryButton} onPress={handleViewYourGroup}>
-              <Text style={styles.primaryButtonText}>View Your Group</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryButton} onPress={handleExploreScene}>
-              <Text style={styles.primaryButtonText}>Explore the Scene</Text>
-            </TouchableOpacity>
-          </>
+        {/* Only show group-related actions if signed in */}
+        { userId ? (
+          groupStatus === 'joined' && userGroup ? ( // Ensure userGroup is also available
+            <>
+              <Text style={styles.ctaText}>You are already part of a group for this party!</Text>
+              <TouchableOpacity style={styles.primaryButton} onPress={handleViewYourGroup}>
+                <Text style={styles.primaryButtonText}>Group Profile</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.primaryButton} onPress={handleExploreScene}>
+                <Text style={styles.primaryButtonText}>Explore the Scene</Text>
+              </TouchableOpacity>
+            </>
+          ) : groupStatus === 'invited' ? (
+            <>
+              <Text style={styles.ctaText}>You have a pending invitation for a group for this party!</Text>
+              {/* Link to Join Group screen where they can accept/decline */}
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => {
+                  router.push(`/party/${partyId}/groups/join`);
+                }}
+              >
+                <Text style={styles.primaryButtonText}>View Invitation</Text>
+              </TouchableOpacity>
+            </>
+          ) : ( // No group or invited status found for the user
+            <>
+              <Text style={styles.ctaText}>
+                Before Connecting With Others,
+                {'\n'}
+                Establish Who You are Going With!
+              </Text>
+              <TouchableOpacity
+                style={[styles.primaryButton, isCreatingGroup && styles.disabledButton]}
+                onPress={handleCreateGroup}
+                disabled={isCreatingGroup} // Disable while creating
+              >
+                {isCreatingGroup ? (
+                  <ActivityIndicator color={AppColors.white} />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Create Group</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => {
+                  router.push(`/party/${partyId}/groups/join`);
+                }}
+              >
+                <Text style={styles.primaryButtonText}>Join Group</Text>
+              </TouchableOpacity>
+            </>
+          )
         ) : (
+          // User is not signed in
           <>
             <Text style={styles.ctaText}>
-              Before Connecting With Others,
-              {'\n'}
-              Establish Who You are Going With!
+              Sign in to create or join a group and connect with others!
             </Text>
-            <TouchableOpacity
-              style={[styles.primaryButton, isCreatingGroup && styles.disabledButton]}
-              onPress={handleCreateGroup}
-              disabled={isCreatingGroup}
-            >
-              {isCreatingGroup ? (
-                <ActivityIndicator color={AppColors.white} />
-              ) : (
-                <Text style={styles.primaryButtonText}>Create Group</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={() => {
-                router.push(`/party/${partyId}/groups/join`)
-              }}
-            >
-              <Text style={styles.primaryButtonText}>Join Group</Text>
-            </TouchableOpacity>
+            {/* Optionally add a sign-in button */}
+            {/* <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/sign-in')}>
+                     <Text style={styles.primaryButtonText}>Sign In</Text>
+                 </TouchableOpacity> */}
+            <Text style={styles.signInPrompt}>You can still view party details and your ticket.</Text>
           </>
         )}
       </View>
 
+      {/* Show Ticket Button */}
       <View style={styles.ticketButtonContainer}>
         <TouchableOpacity onPress={handleTicket} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Show my ticket</Text>
         </TouchableOpacity>
       </View>
 
+      {/* QR Code Modal */}
       {showQR && (
         <Modal
           animationType="slide"
@@ -299,8 +423,8 @@ const PartyLandingScreen: React.FC = () => {
         </Modal>
       )}
     </ScrollView>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -316,24 +440,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: AppColors.background,
+    paddingHorizontal: 20, // Add padding for text wrapping
   },
   loaderText: {
     marginTop: 10,
     fontSize: 16,
     color: AppColors.white,
+    textAlign: 'center', // Center text
   },
   errorText: {
     fontSize: 18,
-    color: AppColors.white,
+    color: AppColors.white, // Consider using a distinct error color if available in AppColors
     textAlign: 'center',
-    marginBottom: 20,
+    marginVertical: 20,
+    paddingHorizontal: 20, // Add padding for text wrapping
   },
   headerActions: {
     width: '100%',
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 40 : 60,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between', // Space between back button and potential other items
     alignItems: 'center',
   },
   backButtonContainer: {
@@ -341,135 +468,144 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.2)', // Semi-transparent background
     borderRadius: 20,
   },
-  backButtonContainerError: {
+  backButtonContainerError: { // Style specific to error screen back button
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 15,
-    backgroundColor: AppColors.cardBg,
+    backgroundColor: AppColors.cardBg, // Use card background for button on error screen
     borderRadius: 25,
     marginTop: 20,
   },
   backButtonText: {
     marginLeft: 6,
-    color: AppColors.gray300,
+    color: AppColors.gray300, // Gray text color
     fontSize: 14,
     fontWeight: '500',
   },
   profileHeader: {
     width: '100%',
-    alignItems: 'flex-end',
+    alignItems: 'flex-end', // Align to the right
     paddingHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: 10, // Space below profile picture
   },
-  userButtonWrapper: {},
+  userButtonWrapper: {}, // Wrapper for touchable area if needed
   profilePicture: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: AppColors.gray300,
+    borderRadius: 24, // Perfect circle
+    borderWidth: 2, // Border around picture
+    borderColor: AppColors.gray300, // Border color
   },
   eventSummaryCard: {
     backgroundColor: AppColors.cardBg,
     borderRadius: 12,
-    marginHorizontal: 20,
-    width: screenWidth - 40,
-    overflow: 'hidden',
-    marginBottom: 30,
-    elevation: 5,
-    shadowColor: AppColors.black,
+    marginHorizontal: 20, // Horizontal margin
+    width: screenWidth - 40, // Card width
+    overflow: 'hidden', // Hide content outside border-radius
+    marginBottom: 30, // Space below card
+    elevation: 5, // Android shadow
+    shadowColor: AppColors.black, // iOS shadow
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
   eventImageContainer: {
     width: '100%',
-    height: 180,
+    height: 180, // Fixed height for image container
   },
   eventImage: {
     width: '100%',
     height: '100%',
   },
   eventDetails: {
-    padding: 20,
+    padding: 20, // Padding inside details section
   },
   eventName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: AppColors.white,
-    marginBottom: 15,
+    marginBottom: 15, // Space below event name
   },
-  eventMeta: {},
+  eventMeta: {}, // Wrapper for meta items
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 8, // Space between meta items
   },
   metaText: {
     fontSize: 15,
     color: AppColors.gray300,
-    marginLeft: 10,
+    marginLeft: 10, // Space between icon and text
   },
   ctaContainer: {
     width: '100%',
-    paddingHorizontal: 30,
-    alignItems: 'center',
-    marginBottom: 30,
+    paddingHorizontal: 30, // Horizontal padding
+    alignItems: 'center', // Center content horizontally
+    marginBottom: 30, // Space below CTA section
   },
   ctaText: {
     fontSize: 16,
     color: AppColors.gray300,
     textAlign: 'center',
-    marginBottom: 25,
-    lineHeight: 22,
+    marginBottom: 25, // Space below CTA text
+    lineHeight: 22, // Improved readability
   },
   primaryButton: {
-    backgroundColor: AppColors.primaryBg,
-    paddingVertical: 14,
-    paddingHorizontal: 30,
-    borderRadius: 25,
+    backgroundColor: AppColors.cardBg, // Card background for button
+    paddingVertical: 14, // Vertical padding
+    paddingHorizontal: 30, // Horizontal padding
+    borderRadius: 25, // Rounded corners
     alignItems: 'center',
     justifyContent: 'center',
-    width: '80%',
-    marginBottom: 15,
-    minHeight: 50,
+    width: '80%', // Button width
+    marginBottom: 15, // Space between buttons
+    minHeight: 50, // Minimum tap target size
+    borderWidth: 1, // Border for definition
+    borderColor: AppColors.primary, // Primary color border
   },
   disabledButton: {
-    backgroundColor: AppColors.gray600,
+    backgroundColor: AppColors.gray600, // Darker gray for disabled state
+    borderColor: AppColors.gray600, // Matching border color
   },
   primaryButtonText: {
     color: AppColors.white,
     fontSize: 16,
     fontWeight: 'bold',
   },
+  signInPrompt: {
+    fontSize: 14,
+    color: AppColors.gray300,
+    textAlign: 'center',
+    marginTop: 10,
+  },
   ticketButtonContainer: {
     width: '100%',
-    alignItems: 'center',
-    paddingHorizontal: 30,
+    alignItems: 'center', // Center button horizontally
+    paddingHorizontal: 30, // Horizontal padding
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)', // Dark semi-transparent background
+    justifyContent: 'center', // Center modal vertically
+    alignItems: 'center', // Center modal horizontally
   },
   modalContent: {
-    backgroundColor: AppColors.cardBg,
-    padding: 30,
-    borderRadius: 15,
+    backgroundColor: AppColors.cardBg, // Card background for modal
+    padding: 30, // Padding inside modal
+    borderRadius: 15, // Rounded corners
     alignItems: 'center',
-    width: '85%',
-    maxWidth: 350,
+    width: '85%', // Modal width
+    maxWidth: 350, // Maximum width for larger screens
   },
   closeButton: {
     position: 'absolute',
     top: 10,
     right: 15,
-    padding: 5,
+    padding: 5, // Make easier to tap
   },
   closeButtonText: {
     fontSize: 24,
@@ -482,6 +618,6 @@ const styles = StyleSheet.create({
     color: AppColors.white,
     textAlign: 'center',
   },
-})
+});
 
-export default PartyLandingScreen
+export default PartyLandingScreen;

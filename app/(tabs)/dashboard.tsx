@@ -36,7 +36,7 @@ import Animated, {
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import Colors, { API_BASE_URL } from '@/constants'
-import { PartyRow } from '@/types/database'
+import { PartyRow, UserRow } from '@/types/database'
 
 const AppColors = Colors.dark
 
@@ -142,7 +142,7 @@ const PartyCard: React.FC<{ party: PartyRow }> = ({ party }) => {
 }
 
 const DashboardScreen: React.FC = () => {
-  const { isLoaded, isSignedIn, signOut } = useAuth()
+  const { isLoaded, isSignedIn, signOut, userId } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'explore' | 'attending'>('explore')
   const [filters, setFilters] = useState({ search: '', date: 'Any Date' })
@@ -200,7 +200,11 @@ const DashboardScreen: React.FC = () => {
       } catch {
         await AsyncStorage.removeItem(cacheKey)
       }
-
+      const userReq = await fetch(`${API_BASE_URL}/user/${userId}`)
+      const userData: UserRow = await userReq.json()
+      if (Object.keys(userData).length === 0) {
+        router.push('/create-profile')
+      }
       try {
         const resp = await fetch(`${API_BASE_URL}/party`)
         if (!resp.ok) throw new Error(`Status ${resp.status}`)
@@ -299,7 +303,7 @@ const DashboardScreen: React.FC = () => {
           headerRight: () => (
             <View style={styles.headerIconsContainer}>
               <TouchableOpacity
-                onPress={() => Alert.alert('Messages', 'Feature coming soon!')}
+                onPress={() => router.push(`/dms`)}
                 style={styles.headerIconWrapper}
               >
                 <MessageSquare size={24} color={AppColors.gray300} />
