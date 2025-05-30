@@ -45,6 +45,36 @@ export default function AppLayout() {
           animation: 'fade',
         }}
       />
+      <Stack.Screen
+        name="chat/[sessionId]"
+        options={{
+          headerShown: false,
+          animation: 'fade',
+        }}
+      />
+      <Stack.Screen
+        name="create-profile"
+        options={{
+          headerShown: false,
+          animation: 'fade',
+        }}
+      />
+
+      <Stack.Screen
+        name="party/[partyId]/groups/[groupId]/summary"
+        options={{
+          headerShown: false,
+          animation: 'fade',
+        }}
+      />
+
+        <Stack.Screen
+        name="user/update"
+        options={{
+          headerShown: false,
+          animation: 'fade',
+        }}
+      />
 
     </Stack>
   );

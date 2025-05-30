@@ -9,9 +9,9 @@ import {
   Alert,
   Platform,
   RefreshControl,
-  Image // Assuming we might want to show user profile pictures
+  Image
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import {
   MessageSquare,
@@ -29,23 +29,23 @@ import { ChatSessionRow, UserRow } from '@/types/database';
 
 const AppColors = Colors.dark;
 
-// Placeholder for user details lookup. In a real app, you'd likely fetch this
-// from a user service or have it pre-loaded.
+
+
 interface OpponentUserMap {
   [userId: string]: UserRow;
 }
 
-// Represents a chat session with the opponent's user details included
+
 interface EnrichedChatSession extends ChatSessionRow {
   opponentUser: UserRow | null;
 }
 
-// Define the types for your FlatList data items
+
 type FlatListDataItem =
   | { type: 'header'; title: string }
   | { type: 'session'; data: EnrichedChatSession };
 
-// --- ChatSessionCard Component ---
+
 interface ChatSessionCardProps {
   session: EnrichedChatSession;
   myUserId: string;
@@ -63,11 +63,10 @@ const ChatSessionCard: React.FC<ChatSessionCardProps> = ({
 }) => {
   const isRequester = session.user1_id === myUserId;
   const isPendingReceived = session.status === 'pending' && !isRequester;
-  const isPendingSent = session.status === 'pending' && isRequester;
 
   const opponentProfilePicUri = session.opponentUser?.user_id
     ? `${API_BASE_URL}/user/${session.opponentUser.user_id}/profile-picture`
-    : 'https://via.placeholder.com/100/A020F0/FFFFFF?text=U'; // Fallback
+    : 'https://via.placeholder.com/100/A020F0/FFFFFF?text=U';
 
   return (
     <View style={styles.chatCardContainer}>
@@ -126,30 +125,29 @@ const ChatSessionCard: React.FC<ChatSessionCardProps> = ({
   );
 };
 
-// --- DMScreen Component ---
+
 const DMScreen: React.FC = () => {
   const router = useRouter();
   const { userId: myUserId, isLoaded, isSignedIn } = useAuth();
 
   const [allChatSessions, setAllChatSessions] = useState<EnrichedChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [opponentUsers, setOpponentUsers] = useState<OpponentUserMap>({});
+  const { partyId } = useLocalSearchParams<{ partyId: string }>()
 
-  // Fetch all chat sessions for the current user
+
   const fetchChatSessions = useCallback(async () => {
     if (!myUserId) return;
 
     !refreshing && setIsLoading(true);
-    setError(null);
     try {
       const response = await fetch(`${API_BASE_URL}/chat/sessions/${myUserId}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch chat sessions: ${response.status}`);
       }
-      const data: { sessions: ChatSessionRow[] } = await response.json();
-
+      let data: { sessions: ChatSessionRow[] } = await response.json();
+      data.sessions = data.sessions.filter(v => v.party_id === partyId)
+      
       const uniqueOpponentIds = new Set<string>();
       data.sessions.forEach(session => {
         const opponentId = session.user1_id === myUserId ? session.user2_id : session.user1_id;
@@ -173,7 +171,6 @@ const DMScreen: React.FC = () => {
           }
         })
       );
-      setOpponentUsers(prev => ({ ...prev, ...fetchedOpponentUsers }));
 
       const enrichedSessions = data.sessions.map(session => {
         const opponentId = session.user1_id === myUserId ? session.user2_id : session.user1_id;
@@ -186,7 +183,6 @@ const DMScreen: React.FC = () => {
       setAllChatSessions(enrichedSessions);
       await AsyncStorage.setItem(`chat_sessions_${myUserId}`, JSON.stringify(enrichedSessions));
     } catch (e: any) {
-      setError(e.message || 'An error occurred while fetching chat sessions.');
       console.error('Error fetching chat sessions:', e);
       try {
         const cached = await AsyncStorage.getItem(`chat_sessions_${myUserId}`);
@@ -203,7 +199,7 @@ const DMScreen: React.FC = () => {
     }
   }, [myUserId, refreshing]);
 
-  // Initial load and on refresh
+
   useEffect(() => {
     if (isLoaded && isSignedIn && myUserId) {
       fetchChatSessions();
@@ -276,7 +272,6 @@ const DMScreen: React.FC = () => {
   const handleOpenChat = (sessionId: string) => {
 
     router.push(`/chat/${sessionId}`);
-    // Alert.alert('Open Chat', `Navigating to chat session: ${sessionId}`);
   };
 
   const renderSectionHeader = (title: string) => (
@@ -302,7 +297,7 @@ const DMScreen: React.FC = () => {
     );
   }
 
-  // Memoized lists of sessions based on status and sender/receiver
+
   const acceptedSessions = allChatSessions.filter(s => s.status === 'accepted');
   const pendingSentSessions = allChatSessions.filter(
     s => s.status === 'pending' && s.user1_id === myUserId
@@ -312,30 +307,30 @@ const DMScreen: React.FC = () => {
   );
   const declinedSessions = allChatSessions.filter(s => s.status === 'declined');
 
-  // Combine all sessions into a single data array for FlatList,
-  // separated by header components
+
+
   const flatListData: FlatListDataItem[] = [];
 
   if (pendingReceivedSessions.length > 0) {
     flatListData.push({ type: 'header', title: 'Incoming Chat Requests' });
-    flatListData.push(...pendingReceivedSessions.map(s => ({ type: 'session', data: s })));
+    flatListData.push(...pendingReceivedSessions.map(s => ({ type: 'session' as 'session', data: s })));
   }
 
-  // Only show "Chats" section if there are actually chats to show
+
   if (acceptedSessions.length > 0 || pendingSentSessions.length > 0) {
     flatListData.push({ type: 'header', title: 'Chats' });
-    // Add pending sent first
-    flatListData.push(...pendingSentSessions.map(s => ({ type: 'session', data: s })));
-    // Then accepted chats
-    flatListData.push(...acceptedSessions.map(s => ({ type: 'session', data: s })));
+
+    flatListData.push(...pendingSentSessions.map(s => ({ type: 'session' as 'session', data: s })));
+
+    flatListData.push(...acceptedSessions.map(s => ({ type: 'session' as 'session', data: s })));
   }
 
   if (declinedSessions.length > 0) {
     flatListData.push({ type: 'header', title: 'Declined Chats' });
-    flatListData.push(...declinedSessions.map(s => ({ type: 'session', data: s })));
+    flatListData.push(...declinedSessions.map(s => ({ type: 'session' as 'session', data: s })));
   }
 
-  // Handle overall loading state and empty state
+
   if (isLoading && flatListData.length === 0) {
     return (
       <LinearGradient
@@ -413,7 +408,7 @@ const DMScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? 0 : 0, // Adjust for status bar if needed
+    paddingTop: Platform.OS === 'android' ? 0 : 0,
   },
   centeredStatusContainer: {
     flex: 1,
@@ -427,7 +422,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 10,
-    marginLeft: -10, // Adjust to align visually
+    marginLeft: -10,
   },
   flatListContent: {
     paddingHorizontal: 16,
@@ -483,8 +478,8 @@ const styles = StyleSheet.create({
   chatCardActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap', // Allow buttons to wrap if needed
-    justifyContent: 'flex-end', // Align buttons to the right
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
   },
   actionButton: {
     flexDirection: 'row',
@@ -493,7 +488,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 20,
     marginLeft: 10,
-    marginTop: 5, // Add a small margin for wrapping
+    marginTop: 5,
   },
   actionButtonText: {
     color: AppColors.white,

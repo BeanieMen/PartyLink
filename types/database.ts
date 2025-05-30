@@ -96,6 +96,7 @@ export interface ChatSessionRow {
   chat_session_id: string
   user1_id: string // requester
   user2_id: string // requestee
+  party_id: string;
   status: 'pending' | 'accepted' | 'declined'
   created_at: string
   updated_at: string
@@ -112,6 +113,7 @@ export interface MessageRow {
 export interface GroupChatRow {
   group_chat_id: string
   group1_id: string
+  party_id: string;
   group2_id: string
   created_at: string
   updated_at: string

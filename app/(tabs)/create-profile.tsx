@@ -15,27 +15,28 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '@clerk/clerk-expo'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Camera, CheckCircle, Save, UserCircle, Link2 } from 'lucide-react-native' // Added Link2 for socials
+import { Camera, CheckCircle, Save, UserCircle, HelpCircle, LogOut } from 'lucide-react-native'
 import Spinner from 'react-native-loading-spinner-overlay'
 
 import Colors, { API_BASE_URL } from '@/constants'
+import InfoPopup from '@/components/InfoPopup';
 
 const CreateProfileScreen = () => {
   const router = useRouter()
-  const { userId, isSignedIn, isLoaded } = useAuth()
+  const { userId, isSignedIn, isLoaded, signOut } = useAuth()
 
   const [username, setUsername] = useState('')
-  const [description, setDescription] = useState('')
-  const [instagramLink, setInstagramLink] = useState('')
+  // Removed description state
   const [profileImage, setProfileImage] = useState<ImagePicker.ImagePickerAsset | null>(null)
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null)
 
   const [age, setAge] = useState('')
-  const [school, setSchool] = useState('') // Label changed to Career/School
+  const [school, setSchool] = useState('')
   const [portraitImage, setPortraitImage] = useState<ImagePicker.ImagePickerAsset | null>(null)
   const [portraitImageUri, setPortraitImageUri] = useState<string | null>(null)
-  const [socialsInput, setSocialsInput] = useState('') // New state for socials
+  const [socialsInput, setSocialsInput] = useState('') // Consolidated social links
   const [isPrivate, setIsPrivate] = useState(false)
+  const [isPrivateInfoPopupVisible, setIsPrivateInfoPopupVisible] = useState(false);
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -75,7 +76,7 @@ const CreateProfileScreen = () => {
     }
 
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes:  "Images" as ImagePicker.MediaType,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, // Corrected type
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -95,7 +96,7 @@ const CreateProfileScreen = () => {
     }
 
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes:  "Images" as ImagePicker.MediaType,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, // Corrected type
       allowsEditing: true,
       aspect: [3, 4],
       quality: 0.7,
@@ -107,12 +108,11 @@ const CreateProfileScreen = () => {
     }
   }
 
-
   const validateUsername = (uname: string) => {
-    if (!uname.trim()) return 'Username is required.'
-    if (/\s/.test(uname)) return 'Username cannot contain spaces.'
-    if (uname.length < 3) return 'Username must be at least 3 characters long.'
-    if (uname.length > 20) return 'Username cannot exceed 20 characters.'
+    if (!uname.trim()) return 'Name is required.'
+    if (/\s/.test(uname)) return 'Name cannot contain spaces.' // Assuming "Name" implies a single word like username
+    if (uname.length < 3) return 'Name must be at least 3 characters long.'
+    if (uname.length > 20) return 'Name cannot exceed 20 characters.'
     return null
   }
 
@@ -122,20 +122,21 @@ const CreateProfileScreen = () => {
       return
     }
 
+    // Validation for required fields
     const usernameError = validateUsername(username)
     if (usernameError) {
       Alert.alert('Validation Error', usernameError)
       return
     }
 
-    if (!age.trim()) {
-      Alert.alert('Validation Error', 'Age is required.');
-      return;
+    if (!profileImageUri) {
+      Alert.alert('Validation Error', 'Profile Picture (Avatar) is required.')
+      return
     }
-    const ageNum = parseInt(age, 10);
-    if (isNaN(ageNum) || ageNum <= 10 || ageNum > 100) {
-      Alert.alert('Validation Error', 'Please enter a valid age (e.g., 10-100).');
-      return;
+
+    if (!portraitImageUri) {
+      Alert.alert('Validation Error', 'Portrait Picture is required.')
+      return
     }
 
     setLoading(true)
@@ -143,10 +144,19 @@ const CreateProfileScreen = () => {
 
     const formData = new FormData()
     formData.append('userId', userId)
-    formData.append('username', username.trim().toLowerCase())
-    formData.append('age', age.trim());
+    formData.append('username', username.trim().toLowerCase()) // Keep lowercase for storage/lookup
 
-    if (description.trim()) formData.append('description', description.trim())
+    if (age.trim()) {
+      const ageNum = parseInt(age, 10);
+      if (isNaN(ageNum) || ageNum <= 10 || ageNum > 100) {
+        Alert.alert('Validation Error', 'Please enter a valid age (e.g., 10-100), or leave it blank.');
+        setLoading(false);
+        return;
+      }
+      formData.append('age', age.trim());
+    }
+
+    // description is removed
     if (school.trim()) formData.append('school', school.trim());
 
     if (socialsInput.trim()) {
@@ -161,24 +171,13 @@ const CreateProfileScreen = () => {
               /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}([:/?#].*)?$/.test(link))
         );
 
-      const trimmedInstagramLink = instagramLink.trim();
-      if (
-        trimmedInstagramLink &&
-        (trimmedInstagramLink.startsWith('http://') ||
-          trimmedInstagramLink.startsWith('https://') ||
-          /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}([:/?#].*)?$/.test(trimmedInstagramLink))
-      ) {
-        linksArray.push(trimmedInstagramLink);
-      }
-
       if (linksArray.length > 0) {
         formData.append('socials', linksArray.join(','));
       }
     }
     formData.append('is_private', isPrivate ? 'true' : 'false')
 
-
-
+    // Profile Picture (Avatar)
     if (profileImage && profileImage.uri) {
       const uriParts = profileImage.uri.split('.')
       const fileType = uriParts[uriParts.length - 1]
@@ -191,6 +190,7 @@ const CreateProfileScreen = () => {
       } as any)
     }
 
+    // Portrait Picture
     if (portraitImage && portraitImage.uri) {
       const uriParts = portraitImage.uri.split('.')
       const fileType = uriParts[uriParts.length - 1]
@@ -238,11 +238,44 @@ const CreateProfileScreen = () => {
     )
   }
 
+  const privateInfoContent = (
+    <>
+      <Text style={styles.popupText}>
+        When your account is **private**, your profile and activity will only be visible to:
+      </Text>
+      <Text style={styles.popupText}>
+        • Users you are friends with.
+      </Text>
+      <Text style={styles.popupText}>
+        • Members of groups you have matched with and are in a group chat with.
+      </Text>
+      <Text style={styles.popupText}>
+        If your account is **public**, your profile will be visible to all users on the platform.
+      </Text>
+    </>
+  );
+
   return (
     <LinearGradient
       colors={[Colors.dark.primaryBg, Colors.dark.secondaryBg, Colors.dark.darkerBg]}
       style={styles.gradientContainer}
     >
+      <TouchableOpacity
+        style={styles.signOutButton}
+        onPress={() => {
+          Alert.alert(
+            "Sign Out",
+            "Are you sure you want to sign out?",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Sign Out", style: "destructive", onPress: () => signOut() }
+            ]
+          )
+        }}
+      >
+        <LogOut size={24} color={Colors.dark.gray300} />
+      </TouchableOpacity>
+
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.headerContainer}>
           <CheckCircle size={48} color={Colors.dark.pink500} />
@@ -250,7 +283,7 @@ const CreateProfileScreen = () => {
           <Text style={styles.subtitle}>Let's get your PartyLink identity set up!</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Avatar (Square)</Text>
+        <Text style={styles.sectionTitle}>Avatar (Required, Square)</Text>
         <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
           {profileImageUri ? (
             <Image source={{ uri: profileImageUri }} style={styles.profileImagePreview} />
@@ -262,7 +295,7 @@ const CreateProfileScreen = () => {
           )}
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Portrait Picture (Optional)</Text>
+        <Text style={styles.sectionTitle}>Portrait Picture (Required, 3:4 Ratio)</Text>
         <TouchableOpacity onPress={pickPortraitImage} style={styles.portraitImagePicker}>
           {portraitImageUri ? (
             <Image source={{ uri: portraitImageUri }} style={styles.portraitImagePreview} />
@@ -275,23 +308,21 @@ const CreateProfileScreen = () => {
           )}
         </TouchableOpacity>
 
-
-
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Name*</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., alextaylor99"
+            placeholder="e.g., Alex"
             value={username}
-            onChangeText={setUsername}
+            onChangeText={(text) => setUsername(text.charAt(0).toUpperCase() + text.slice(1))} // Auto-capitalize first letter
             placeholderTextColor={Colors.dark.gray400}
-            autoCapitalize="none"
+            autoCapitalize="words" // Capitalize first letter of each word
           />
           <Text style={styles.inputHint}>3-20 characters, no spaces.</Text>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Age*</Text>
+          <Text style={styles.label}>Age (Optional)</Text>
           <TextInput
             style={styles.input}
             placeholder="e.g., 21"
@@ -316,37 +347,10 @@ const CreateProfileScreen = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Bio / Description (Optional)</Text>
+          <Text style={styles.label}>Social Links (Optional)</Text>
           <TextInput
-            style={[styles.input]}
-            placeholder="Tell us a bit about yourself..."
-            value={description}
-            onChangeText={setDescription}
-            placeholderTextColor={Colors.dark.gray400}
-            multiline
-            numberOfLines={3}
-            maxLength={150}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Instagram Link (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="https://instagram.com/yourprofile"
-            value={instagramLink}
-            onChangeText={setInstagramLink}
-            placeholderTextColor={Colors.dark.gray400}
-            keyboardType="url"
-            autoCapitalize="none"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Other Social Links (Optional)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea, { height: 120 }]} // Slightly taller for multiple links
-            placeholder="e.g., twitter.com/user, linkedin.com/in/user"
+            style={[styles.input, styles.textArea, { height: 120 }]}
+            placeholder="e.g., instagram.com/yourprofile, twitter.com/user"
             value={socialsInput}
             onChangeText={setSocialsInput}
             placeholderTextColor={Colors.dark.gray400}
@@ -358,7 +362,7 @@ const CreateProfileScreen = () => {
           <Text style={styles.inputHint}>Separate multiple links with a comma, space, or new line.</Text>
         </View>
 
-        <View style={[styles.inputGroup, { flexDirection: 'row', alignItems: 'center' }]}>
+        <View style={[styles.inputGroup, styles.privateToggleContainer]}>
           <TouchableOpacity
             onPress={() => setIsPrivate(!isPrivate)}
             style={{
@@ -375,11 +379,13 @@ const CreateProfileScreen = () => {
           >
             {isPrivate && <CheckCircle size={18} color={Colors.dark.white} />}
           </TouchableOpacity>
-          <Text style={{ color: Colors.dark.gray200, fontSize: 14 }}>
+          <Text style={styles.privateToggleText}>
             Make my account private
           </Text>
+          <TouchableOpacity onPress={() => setIsPrivateInfoPopupVisible(true)} style={styles.helpButton}>
+            <HelpCircle size={20} color={Colors.dark.gray300} />
+          </TouchableOpacity>
         </View>
-
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -405,6 +411,13 @@ const CreateProfileScreen = () => {
         overlayColor="rgba(0,0,0,0.75)"
         animation="fade"
       />
+
+      <InfoPopup
+        isVisible={isPrivateInfoPopupVisible}
+        onClose={() => setIsPrivateInfoPopupVisible(false)}
+        title="About Private Accounts"
+        content={privateInfoContent}
+      />
     </LinearGradient>
   )
 }
@@ -412,6 +425,7 @@ const CreateProfileScreen = () => {
 const styles = StyleSheet.create({
   gradientContainer: {
     flex: 1,
+    paddingTop: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -424,6 +438,12 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: 40,
     paddingHorizontal: 20,
+  },
+  signOutButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 30,
+    right: 20,
+    zIndex: 10,
   },
   headerContainer: {
     alignItems: 'center',
@@ -530,9 +550,25 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   textArea: {
-    minHeight: 100, // Use minHeight for multiline
+    minHeight: 100,
     textAlignVertical: 'top',
     paddingTop: 15,
+  },
+  privateToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    width: '100%',
+    maxWidth: 400,
+    marginBottom: 20,
+  },
+  privateToggleText: {
+    color: Colors.dark.gray200,
+    fontSize: 14,
+    marginRight: 10,
+  },
+  helpButton: {
+    padding: 5,
   },
   saveButton: {
     backgroundColor: Colors.dark.pink500,
@@ -562,7 +598,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   errorText: {
-    color: Colors.dark.red, // Make sure Colors.dark.red is defined
+    color: Colors.dark.red,
     textAlign: 'center',
     marginBottom: 15,
     marginTop: -5,
@@ -573,6 +609,13 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
   },
+  popupText: {
+    fontSize: 16,
+    marginBottom: 10,
+    textAlign: 'center',
+    color: Colors.dark.gray300,
+    lineHeight: 22,
+  }
 })
 
 export default CreateProfileScreen

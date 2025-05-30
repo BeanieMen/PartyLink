@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,9 @@ import {
   Alert,
   ScrollView,
   Dimensions,
-} from 'react-native'
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router'
-import { useAuth } from '@clerk/clerk-expo'
+} from 'react-native';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useAuth } from '@clerk/clerk-expo';
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -21,48 +21,31 @@ import {
   Ticket,
   Share2,
   Heart,
-} from 'lucide-react-native'
-import { LinearGradient } from 'expo-linear-gradient'
+} from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withRepeat,
   Easing,
-} from 'react-native-reanimated'
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import Colors, { API_BASE_URL } from '@/constants'
-import { PartyRow } from '@/types/database'
+} from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Colors, { API_BASE_URL } from '@/constants'; // Import Colors
+import { PartyRow } from '@/types/database';
 
-const DboardColors = {
-  primaryBg: '#1a0b2e',
-  secondaryBg: '#2d1b4e',
-  darkerBg: '#58216d',
-  cardBg: 'rgba(58, 31, 93, 0.8)',
-  inputBg: 'rgba(58, 31, 93, 0.7)',
-  pink500: Colors.dark.pink500,
-  textWhite: Colors.dark.text,
-  textGray400: Colors.dark.gray400,
-  textGray300: Colors.dark.gray300,
-  borderColor: Colors.dark.gray500,
-  greenText: '#48BB78',
-  greenBg: 'rgba(72, 187, 120, 0.3)',
-  redText: '#F56565',
-  redBg: 'rgba(245, 101, 101, 0.3)',
-}
-
-const { width: screenWidth } = Dimensions.get('window')
+const { width: screenWidth } = Dimensions.get('window');
 
 const PartyDetailsScreen: React.FC = () => {
-  const { id } = useLocalSearchParams()
-  const router = useRouter()
-  const { isLoaded, isSignedIn } = useAuth()
-  const [party, setParty] = useState<PartyRow | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const { userId } = useAuth()
-  const loaderScale = useSharedValue(1)
-  const loaderOpacity = useSharedValue(0.7)
+  const { id } = useLocalSearchParams();
+  const router = useRouter();
+  const { isLoaded, isSignedIn } = useAuth();
+  const [party, setParty] = useState<PartyRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const { userId } = useAuth();
+  const loaderScale = useSharedValue(1);
+  const loaderOpacity = useSharedValue(0.7);
 
   useEffect(() => {
     if (loading) {
@@ -70,148 +53,148 @@ const PartyDetailsScreen: React.FC = () => {
         withTiming(1.2, { duration: 750, easing: Easing.inOut(Easing.ease) }),
         -1,
         true,
-      )
+      );
       loaderOpacity.value = withRepeat(
         withTiming(1, { duration: 750, easing: Easing.inOut(Easing.ease) }),
         -1,
         true,
-      )
+      );
     } else {
-      loaderScale.value = withTiming(1)
-      loaderOpacity.value = withTiming(1)
+      loaderScale.value = withTiming(1);
+      loaderOpacity.value = withTiming(1);
     }
-  }, [loading, loaderScale, loaderOpacity])
+  }, [loading, loaderScale, loaderOpacity]);
 
   const animatedLoaderStyle = useAnimatedStyle(() => ({
     transform: [{ scale: loaderScale.value }],
     opacity: loaderOpacity.value,
-  }))
+  }));
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
-      router.replace('/')
-      return
+      router.replace('/');
+      return;
     }
 
-    if (!id) return
+    if (!id) return;
 
     const fetchParty = async () => {
       try {
-        setLoading(true)
+        setLoading(true);
 
-        const cacheKey = `party_details_${id}`
+        const cacheKey = `party_details_${id}`;
         try {
-          const cached = await AsyncStorage.getItem(cacheKey)
+          const cached = await AsyncStorage.getItem(cacheKey);
           if (cached) {
-            setParty(JSON.parse(cached))
+            setParty(JSON.parse(cached));
           }
         } catch {
-          await AsyncStorage.removeItem(cacheKey)
+          await AsyncStorage.removeItem(cacheKey);
         }
 
-        const response = await fetch(`${API_BASE_URL}/party/${id}`)
+        const response = await fetch(`${API_BASE_URL}/party/${id}`);
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch party: ${response.status}`)
+          throw new Error(`Failed to fetch party: ${response.status}`);
         }
 
-        const data = await response.json()
+        const data = await response.json();
 
-        setParty(data)
-        await AsyncStorage.setItem(cacheKey, JSON.stringify(data))
+        setParty(data);
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
       } catch (err: any) {
-        console.error('Error:', err)
-        setError(`Failed to load party details: ${err.message}`)
+        console.error('Error:', err);
+        setError(`Failed to load party details: ${err.message}`);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchParty()
-  }, [id, isLoaded, isSignedIn, router])
+    fetchParty();
+  }, [id, isLoaded, isSignedIn, router]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !userId || !id || !party) {
       if (isLoaded && !isSignedIn) {
-        router.replace('/')
+        router.replace('/');
       }
-      return
+      return;
     }
 
     const checkAttendanceAndReroute = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/user/${userId}/parties-attending`)
+        const response = await fetch(`${API_BASE_URL}/user/${userId}/parties-attending`);
 
-        if (!response.ok) return
-        const attendingPartyIds: { party_id: string }[] = await response.json()
+        if (!response.ok) return;
+        const attendingPartyIds: { party_id: string }[] = await response.json();
         if (attendingPartyIds.map((row) => row.party_id).includes(id as string)) {
-          router.replace(`/party/${id}/landing`)
+          router.replace(`/party/${id}/landing`);
         }
       } catch (err: any) {
-        console.error('Error checking user attendance:', err)
+        console.error('Error checking user attendance:', err);
       }
-    }
+    };
 
-    checkAttendanceAndReroute()
-  }, [isLoaded, isSignedIn, userId, id, party, router])
+    checkAttendanceAndReroute();
+  }, [isLoaded, isSignedIn, userId, id, party, router]);
 
   const handleAttend = async () => {
     if (!party || !userId) {
-      Alert.alert('Error', 'Party details not loaded or user not identified.')
-      return
+      Alert.alert('Error', 'Party details not loaded or user not identified.');
+      return;
     }
 
     try {
       const response = await fetch(
         `${API_BASE_URL}/party/${party.party_id}/attend?userId=${userId}`,
-      )
+      );
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (response.ok && data.success) {
-        Alert.alert('Success', data.message || "Successfully RSVP'd!")
-        router.replace(`/party/${id}/landing`)
+        Alert.alert('Success', data.message || "Successfully RSVP'd!");
+        router.replace(`/party/${id}/landing`);
       } else {
-        Alert.alert('RSVP Failed', data.message || 'Could not RSVP for the party.')
+        Alert.alert('RSVP Failed', data.message || 'Could not RSVP for the party.');
       }
     } catch (err: any) {
-      console.error('Error updating attendance:', err)
-      Alert.alert('Error', `Failed to RSVP: ${err.message}`)
+      console.error('Error updating attendance:', err);
+      Alert.alert('Error', `Failed to RSVP: ${err.message}`);
     }
-  }
+  };
 
   if (!isLoaded || (isLoaded && !isSignedIn)) {
     return (
       <LinearGradient
-        colors={[DboardColors.primaryBg, DboardColors.secondaryBg, DboardColors.darkerBg]}
+        colors={[Colors.dark.primaryBg, Colors.dark.secondaryBg, Colors.dark.darkerBg]}
         style={styles.loaderContainer}
       >
         <Animated.View style={[styles.loaderContent, animatedLoaderStyle]}>
-          <PartyPopper size={64} color={DboardColors.pink500} />
+          <PartyPopper size={64} color={Colors.dark.pink500} />
         </Animated.View>
         <Text style={styles.loaderText}>Loading PartyLink...</Text>
       </LinearGradient>
-    )
+    );
   }
 
   if (loading && !party) {
     return (
       <LinearGradient
-        colors={[DboardColors.primaryBg, DboardColors.secondaryBg, DboardColors.darkerBg]}
+        colors={[Colors.dark.primaryBg, Colors.dark.secondaryBg, Colors.dark.darkerBg]}
         style={styles.loaderContainer}
       >
         <Animated.View style={[styles.loaderContent, animatedLoaderStyle]}>
-          <PartyPopper size={64} color={DboardColors.pink500} />
+          <PartyPopper size={64} color={Colors.dark.pink500} />
         </Animated.View>
         <Text style={styles.loaderText}>Getting the Party Ready...</Text>
       </LinearGradient>
-    )
+    );
   }
 
   if (error) {
     return (
       <LinearGradient
-        colors={[DboardColors.primaryBg, DboardColors.secondaryBg, DboardColors.darkerBg]}
+        colors={[Colors.dark.primaryBg, Colors.dark.secondaryBg, Colors.dark.darkerBg]}
         style={styles.errorContainer}
       >
         <View style={styles.errorContent}>
@@ -222,13 +205,13 @@ const PartyDetailsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </LinearGradient>
-    )
+    );
   }
 
   if (!party) {
     return (
       <LinearGradient
-        colors={[DboardColors.primaryBg, DboardColors.secondaryBg, DboardColors.darkerBg]}
+        colors={[Colors.dark.primaryBg, Colors.dark.secondaryBg, Colors.dark.darkerBg]}
         style={styles.errorContainer}
       >
         <View style={styles.errorContent}>
@@ -241,12 +224,12 @@ const PartyDetailsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </LinearGradient>
-    )
+    );
   }
 
   return (
     <LinearGradient
-      colors={[DboardColors.primaryBg, DboardColors.secondaryBg, DboardColors.darkerBg]}
+      colors={[Colors.dark.primaryBg, Colors.dark.secondaryBg, Colors.dark.darkerBg]}
       style={styles.container}
     >
       <Stack.Screen
@@ -263,7 +246,7 @@ const PartyDetailsScreen: React.FC = () => {
         <View style={styles.heroGradient} />
 
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color={DboardColors.textWhite} />
+          <ArrowLeft size={24} color={Colors.dark.text} />
         </TouchableOpacity>
       </View>
 
@@ -273,15 +256,15 @@ const PartyDetailsScreen: React.FC = () => {
 
           <View style={styles.partyMetaContainer}>
             <View style={styles.partyMetaItem}>
-              <CalendarIcon size={18} color={DboardColors.pink500} style={styles.metaIcon} />
+              <CalendarIcon size={18} color={Colors.dark.pink500} style={styles.metaIcon} />
               <Text style={styles.metaText}>{party.party_date}</Text>
             </View>
             <View style={styles.partyMetaItem}>
-              <Clock size={18} color={DboardColors.pink500} style={styles.metaIcon} />
+              <Clock size={18} color={Colors.dark.pink500} style={styles.metaIcon} />
               <Text style={styles.metaText}>{party.party_time || '8:00 PM'}</Text>
             </View>
             <View style={styles.partyMetaItem}>
-              <MapPin size={18} color={DboardColors.pink500} style={styles.metaIcon} />
+              <MapPin size={18} color={Colors.dark.pink500} style={styles.metaIcon} />
               <Text style={styles.metaText}>{party.location}</Text>
             </View>
           </View>
@@ -296,7 +279,7 @@ const PartyDetailsScreen: React.FC = () => {
                   styles.ticketBadge,
                   {
                     backgroundColor:
-                      party.tickets_left > 0 ? DboardColors.greenBg : DboardColors.redBg,
+                      party.tickets_left > 0 ? `${Colors.dark.green400}30` : `${Colors.dark.red400}30`,
                   },
                 ]}
               >
@@ -304,7 +287,7 @@ const PartyDetailsScreen: React.FC = () => {
                   style={[
                     styles.ticketBadgeText,
                     {
-                      color: party.tickets_left > 0 ? DboardColors.greenText : DboardColors.redText,
+                      color: party.tickets_left > 0 ? Colors.dark.green400 : Colors.dark.red400,
                     },
                   ]}
                 >
@@ -317,7 +300,7 @@ const PartyDetailsScreen: React.FC = () => {
               style={[
                 styles.attendButton,
                 {
-                  backgroundColor: party.tickets_left > 0 ? DboardColors.pink500 : '#4A5568',
+                  backgroundColor: party.tickets_left > 0 ? Colors.dark.pink500 : Colors.dark.gray700, // Using gray700 for disabled
                 },
               ]}
               onPress={handleAttend}
@@ -327,7 +310,7 @@ const PartyDetailsScreen: React.FC = () => {
                 <ActivityIndicator color="white" size="small" />
               ) : (
                 <>
-                  <Ticket size={20} color={DboardColors.textWhite} style={{ marginRight: 8 }} />
+                  <Ticket size={20} color={Colors.dark.text} style={{ marginRight: 8 }} />
                   <Text style={styles.attendButtonText}>
                     {party.tickets_left > 0 ? 'RSVP to Party' : 'Sold Out'}
                   </Text>
@@ -351,7 +334,7 @@ const PartyDetailsScreen: React.FC = () => {
 
           {/* Map Placeholder */}
           <View style={styles.mapPlaceholder}>
-            <MapPin size={32} color={DboardColors.pink500} />
+            <MapPin size={32} color={Colors.dark.pink500} />
             <Text style={styles.mapPlaceholderText}>Map view will be displayed here</Text>
           </View>
         </View>
@@ -365,7 +348,7 @@ const PartyDetailsScreen: React.FC = () => {
                   styles.ticketBadge,
                   {
                     backgroundColor:
-                      party.tickets_left > 0 ? DboardColors.greenBg : DboardColors.redBg,
+                      party.tickets_left > 0 ? `${Colors.dark.green400}30` : `${Colors.dark.red400}30`,
                   },
                 ]}
               >
@@ -373,7 +356,7 @@ const PartyDetailsScreen: React.FC = () => {
                   style={[
                     styles.ticketBadgeText,
                     {
-                      color: party.tickets_left > 0 ? DboardColors.greenText : DboardColors.redText,
+                      color: party.tickets_left > 0 ? Colors.dark.green400 : Colors.dark.red400,
                     },
                   ]}
                 >
@@ -386,7 +369,7 @@ const PartyDetailsScreen: React.FC = () => {
               style={[
                 styles.attendButton,
                 {
-                  backgroundColor: party.tickets_left > 0 ? DboardColors.pink500 : '#4A5568',
+                  backgroundColor: party.tickets_left > 0 ? Colors.dark.pink500 : Colors.dark.gray700,
                 },
               ]}
               onPress={handleAttend}
@@ -396,7 +379,7 @@ const PartyDetailsScreen: React.FC = () => {
                 <ActivityIndicator color="white" size="small" />
               ) : (
                 <>
-                  <Ticket size={20} color={DboardColors.textWhite} style={{ marginRight: 8 }} />
+                  <Ticket size={20} color={Colors.dark.text} style={{ marginRight: 8 }} />
                   <Text style={styles.attendButtonText}>
                     {party.tickets_left > 0 ? 'RSVP to Party' : 'Sold Out'}
                   </Text>
@@ -406,11 +389,11 @@ const PartyDetailsScreen: React.FC = () => {
 
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity style={styles.actionButton}>
-                <Heart size={18} color={DboardColors.textGray300} style={{ marginRight: 8 }} />
+                <Heart size={18} color={Colors.dark.gray300} style={{ marginRight: 8 }} />
                 <Text style={styles.actionButtonText}>Save</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton}>
-                <Share2 size={18} color={DboardColors.textGray300} style={{ marginRight: 8 }} />
+                <Share2 size={18} color={Colors.dark.gray300} style={{ marginRight: 8 }} />
                 <Text style={styles.actionButtonText}>Share</Text>
               </TouchableOpacity>
             </View>
@@ -420,8 +403,8 @@ const PartyDetailsScreen: React.FC = () => {
         <View style={{ height: 30 }} />
       </ScrollView>
     </LinearGradient>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -439,7 +422,7 @@ const styles = StyleSheet.create({
   loaderText: {
     marginTop: 20,
     fontSize: 18,
-    color: DboardColors.textWhite,
+    color: Colors.dark.text,
     fontWeight: '600',
   },
   errorContainer: {
@@ -449,7 +432,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   errorContent: {
-    backgroundColor: DboardColors.cardBg,
+    backgroundColor: Colors.dark.cardBg,
     padding: 24,
     borderRadius: 12,
     alignItems: 'center',
@@ -459,23 +442,23 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: DboardColors.textWhite,
+    color: Colors.dark.text,
     marginBottom: 12,
   },
   errorMessage: {
     fontSize: 16,
-    color: DboardColors.textGray300,
+    color: Colors.dark.gray300,
     textAlign: 'center',
     marginBottom: 24,
   },
   errorButton: {
-    backgroundColor: DboardColors.pink500,
+    backgroundColor: Colors.dark.pink500,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
   },
   errorButtonText: {
-    color: DboardColors.textWhite,
+    color: Colors.dark.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -496,7 +479,7 @@ const styles = StyleSheet.create({
     right: 0,
     height: 160,
     backgroundColor: 'transparent',
-    shadowColor: DboardColors.primaryBg,
+    shadowColor: Colors.dark.primaryBg, // Using primaryBg for shadow
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 80,
@@ -519,7 +502,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   partyHeaderCard: {
-    backgroundColor: DboardColors.cardBg,
+    backgroundColor: Colors.dark.cardBg,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -532,7 +515,7 @@ const styles = StyleSheet.create({
   partyTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: DboardColors.textWhite,
+    color: Colors.dark.text,
     marginBottom: 16,
   },
   partyMetaContainer: {
@@ -548,10 +531,10 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 14,
-    color: DboardColors.textGray300,
+    color: Colors.dark.gray300,
   },
   ticketCard: {
-    backgroundColor: DboardColors.cardBg,
+    backgroundColor: Colors.dark.cardBg,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -570,7 +553,7 @@ const styles = StyleSheet.create({
   ticketPrice: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: DboardColors.textWhite,
+    color: Colors.dark.text,
   },
   ticketBadge: {
     paddingHorizontal: 12,
@@ -590,7 +573,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   attendButtonText: {
-    color: DboardColors.textWhite,
+    color: Colors.dark.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -603,18 +586,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: DboardColors.secondaryBg,
+    backgroundColor: Colors.dark.secondaryBg,
     paddingVertical: 10,
     borderRadius: 8,
     marginHorizontal: 4,
   },
   actionButtonText: {
-    color: DboardColors.textGray300,
+    color: Colors.dark.gray300,
     fontSize: 14,
     fontWeight: '500',
   },
   descriptionCard: {
-    backgroundColor: DboardColors.cardBg,
+    backgroundColor: Colors.dark.cardBg,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -627,16 +610,16 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: DboardColors.textWhite,
+    color: Colors.dark.text,
     marginBottom: 12,
   },
   descriptionText: {
     fontSize: 14,
     lineHeight: 22,
-    color: DboardColors.textGray300,
+    color: Colors.dark.gray300,
   },
   locationCard: {
-    backgroundColor: DboardColors.cardBg,
+    backgroundColor: Colors.dark.cardBg,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -648,22 +631,22 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 14,
-    color: DboardColors.textGray300,
+    color: Colors.dark.gray300,
     marginBottom: 16,
   },
   mapPlaceholder: {
     height: 180,
-    backgroundColor: '#4A5568',
+    backgroundColor: Colors.dark.gray700, // Using a gray color for placeholder
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
   },
   mapPlaceholderText: {
-    color: DboardColors.textGray300,
+    color: Colors.dark.gray300,
     marginLeft: 8,
     fontSize: 14,
   },
-})
+});
 
-export default PartyDetailsScreen
+export default PartyDetailsScreen;

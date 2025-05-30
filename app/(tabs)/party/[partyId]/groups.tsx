@@ -23,10 +23,9 @@ import {
   CheckCircle,
   Users,
   HelpCircle,
-  ShieldCheck, // Example icon for "Establish" button
 } from 'lucide-react-native'
 import Colors, { API_BASE_URL } from '@/constants'
-// Assuming GroupRow now includes 'established: boolean'
+
 import { GroupRow, QuestionRow, VoteRow, CommentRow } from '@/types/database'
 
 const AppColors = Colors.dark
@@ -42,18 +41,18 @@ interface FrontendQuestion extends QuestionRow {
   vote_counts?: { [voted_for_user_id: string]: number }
 }
 interface FrontendGroupDetails {
-  group: GroupRow; // Assuming GroupRow has 'established: boolean'
+  group: GroupRow;
   members: {
     userId: string
     status: string
     username?: string
     pfp_url?: string;
   }[]
-  comments: CommentRow[] & { username?: string }[]; // Adjusted for optimistic update
+  comments: CommentRow[] & { username?: string }[];
   questions: FrontendQuestion[]
 }
 
-interface FrontendCommentRow extends CommentRow { // For optimistic update with username
+interface FrontendCommentRow extends CommentRow {
   username?: string;
 }
 
@@ -76,13 +75,14 @@ const GroupDetailsScreen: React.FC = () => {
   const [newComment, setNewComment] = useState('')
   const [isPostingComment, setIsPostingComment] = useState(false)
   const [isSubmittingVote, setIsSubmittingVote] = useState<string | null>(null)
-  const [isEstablishingGroup, setIsEstablishingGroup] = useState(false); // New state
+  const [hasUserCommented, setHasUserCommented] = useState(false); // NEW STATE
 
   const [error, setError] = useState<string | null>(null)
 
   const fetchGroupDetails = useCallback(async () => {
     if (!userGroupId) {
       setGroupDetails(null)
+      setHasUserCommented(false); // Reset if no group
       return
     }
     setIsLoadingGroupDetails(true)
@@ -115,16 +115,26 @@ const GroupDetailsScreen: React.FC = () => {
         return { ...q, votes: votesArray, my_vote: myVote || null, vote_counts: voteCounts }
       })
 
+      const processedComments = commentData.map(c => ({
+        ...c,
+        username: memberData.members.find(m => m.userId === c.user_id)?.username || (c.user_id === userId ? "You" : "A member")
+      }));
+
+      // Check if the current user has commented
+      const userHasCommented = processedComments.some(comment => comment.user_id === userId);
+      setHasUserCommented(userHasCommented); // Update the state
+
       setGroupDetails({
         group: groupData,
         members: memberData.members.filter(member => member.status === "joined"),
-        comments: commentData.map(c => ({ ...c, username: memberData.members.find(m => m.userId === c.user_id)?.username || (c.user_id === userId ? "You" : "A member") })),
+        comments: processedComments,
         questions: processedQuestions,
       })
     } catch (err) {
       console.error('Fetch Group Details Error:', err)
       setError(err instanceof Error ? err.message : 'Could not load group details.')
       setGroupDetails(null)
+      setHasUserCommented(false); // Reset on error
     } finally {
       setIsLoadingGroupDetails(false)
     }
@@ -165,11 +175,14 @@ const GroupDetailsScreen: React.FC = () => {
 
   useEffect(() => {
     if (userGroupId) { fetchGroupDetails() }
-    else { setGroupDetails(null) }
+    else {
+      setGroupDetails(null);
+      setHasUserCommented(false); // Reset if no group
+    }
   }, [userGroupId, fetchGroupDetails])
 
   const handlePostComment = async () => {
-    if (newComment.trim() === '' || !userGroupId || !userId) return
+    if (newComment.trim() === '' || !userGroupId || !userId || hasUserCommented) return // Added hasUserCommented check
     setIsPostingComment(true)
     try {
       const response = await fetch(`${API_BASE_URL}/group/${userGroupId}/comments`, {
@@ -186,6 +199,7 @@ const GroupDetailsScreen: React.FC = () => {
         const commentWithUsername: FrontendCommentRow = { ...newCommentData, username: commenter?.username || (userId === newCommentData.user_id ? 'You' : 'A member') };
         return { ...prevDetails, comments: [commentWithUsername, ...prevDetails.comments] };
       });
+      setHasUserCommented(true); // User has now commented, disable future comments
     } catch (err) {
       console.error('Post Comment Error:', err)
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not post comment.')
@@ -212,32 +226,6 @@ const GroupDetailsScreen: React.FC = () => {
     }
   }
 
-  // New function to handle establishing the group
-  const handleEstablishGroup = async () => {
-    if (!userGroupId || !isCreator || groupDetails?.group.established) { // Check established status
-      Alert.alert("Info", "This group cannot be established at this time or is already established.");
-      return;
-    }
-    setIsEstablishingGroup(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/group/${userGroupId}/establish`, {
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to establish group. Unknown error.' }));
-        throw new Error(errorData.message);
-      }
-      Alert.alert("Success", "Group established!");
-      fetchGroupDetails(); // Refresh details to update UI (e.g., hide button)
-    } catch (err) {
-      console.error('Establish Group Error:', err);
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not establish group.');
-    } finally {
-      setIsEstablishingGroup(false);
-    }
-  };
-
-
-  // --- Loading and Error States ---
   if (isLoadingGroupStatus || (!authLoaded && !userId)) {
     return (
       <View style={styles.loaderContainer}>
@@ -281,7 +269,7 @@ const GroupDetailsScreen: React.FC = () => {
     )
   }
 
-  if (!groupDetails || !userGroupId) { // Should be caught by above, but as a final safeguard
+  if (!groupDetails || !userGroupId) {
     return (
       <View style={styles.loaderContainer}>
         <Text style={styles.errorText}>Unable to display group details. Please ensure you are part of an active group.</Text>
@@ -291,18 +279,17 @@ const GroupDetailsScreen: React.FC = () => {
       </View>
     );
   }
-  // --- End Loading and Error States ---
+
 
   const isCreator = userId === groupDetails.group.creator_user_id;
-  const editButtonIconSize = 22;
-  const editButtonPaddingHorizontal = 12;
-  const editButtonPaddingVertical = 8;
-  const editButtonCalculatedWidth = editButtonIconSize + (editButtonPaddingHorizontal * 2);
+  // const editButtonIconSize = 22; // Already declared outside
+  // const editButtonPaddingHorizontal = 12; // Already declared outside
+  // const editButtonCalculatedWidth = editButtonIconSize + (editButtonPaddingHorizontal * 2); // Already declared outside
 
   const renderMemberItem = ({ item }: { item: FrontendGroupDetails['members'][0] }) => (
     <View style={styles.memberItem}>
       <Image
-        source={{ uri: item.pfp_url || `${API_BASE_URL}/user/${item.userId}/profile-picture` }}
+        source={{ uri: item.pfp_url || `${API_BASE_URL}/user/${item.userId}/portrait` }}
         style={styles.memberPfp}
       />
       <Text style={styles.memberUsername} numberOfLines={1}>
@@ -314,7 +301,7 @@ const GroupDetailsScreen: React.FC = () => {
   const renderCommentItem = ({ item }: { item: FrontendCommentRow }) => (
     <View style={styles.commentItem}>
       <Image
-        source={{ uri: `${API_BASE_URL}/user/${item.user_id}/profile-picture` }} // Assuming comments have user_id
+        source={{ uri: `${API_BASE_URL}/user/${item.user_id}/profile-picture` }}
         style={styles.commenterPfp}
       />
       <View style={styles.commentContent}>
@@ -403,7 +390,7 @@ const GroupDetailsScreen: React.FC = () => {
             keyExtractor={(item) => item.userId}
             numColumns={2}
             columnWrapperStyle={styles.membersRow}
-            scrollEnabled={false} // Important if inside a ScrollView
+            scrollEnabled={false}
           />
         ) : (
           <Text style={styles.emptyStateText}>No members have joined yet.</Text>
@@ -413,45 +400,52 @@ const GroupDetailsScreen: React.FC = () => {
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeader}>
           <MessageSquare size={20} color={AppColors.primary} />
-          <Text style={styles.sectionTitle}>Group Chat</Text>
+          <Text style={styles.sectionTitle}>Comments</Text> {/* Changed title to reflect section content */}
         </View>
         <FlatList
           data={[...groupDetails.comments]
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            // Username mapping is now done in fetchGroupDetails or optimistic update
+
           }
           renderItem={renderCommentItem}
           keyExtractor={(item) => item.comment_id}
           style={styles.commentsList}
           ListEmptyComponent={
-            <Text style={styles.emptyStateText}>No comments yet. Start the conversation!</Text>
+            <Text style={styles.emptyStateText}>No comments yet.</Text>
           }
           scrollEnabled={false}
         />
-        <View style={styles.commentInputContainer}>
-          <TextInput
-            style={styles.commentInput}
-            placeholder="Write a comment..."
-            placeholderTextColor={AppColors.textGray}
-            value={newComment}
-            onChangeText={setNewComment}
-            multiline
-          />
-          <TouchableOpacity
-            style={[
-              styles.postCommentButton,
-              (isPostingComment || newComment.trim() === '') && styles.disabledButton,
-            ]}
-            onPress={handlePostComment}
-            disabled={isPostingComment || newComment.trim() === ''}
-          >
-            {isPostingComment ? (
-              <ActivityIndicator size="small" color={AppColors.white} />
-            ) : (
-              <Send size={20} color={AppColors.white} />
-            )}
-          </TouchableOpacity>
-        </View>
+        {hasUserCommented ? (
+          <View style={styles.commentInputContainer}>
+            <Text style={styles.alreadyCommentedText}>You have already added a comment to this group.</Text>
+          </View>
+        ) : (
+          <View style={styles.commentInputContainer}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Write a comment..."
+              placeholderTextColor={AppColors.textGray}
+              value={newComment}
+              onChangeText={setNewComment}
+              multiline
+              editable={!isPostingComment && !hasUserCommented} // Ensure editable is false if user has commented
+            />
+            <TouchableOpacity
+              style={[
+                styles.postCommentButton,
+                (isPostingComment || newComment.trim() === '' || hasUserCommented) && styles.disabledButton, // Disable if user has commented
+              ]}
+              onPress={handlePostComment}
+              disabled={isPostingComment || newComment.trim() === '' || hasUserCommented} // Disable if user has commented
+            >
+              {isPostingComment ? (
+                <ActivityIndicator size="small" color={AppColors.white} />
+              ) : (
+                <Send size={20} color={AppColors.white} />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {groupDetails.questions && groupDetails.questions.length > 0 && (
@@ -468,26 +462,6 @@ const GroupDetailsScreen: React.FC = () => {
             keyExtractor={(item) => item.question_id}
             scrollEnabled={false}
           />
-        </View>
-      )}
-
-      {/* Establish Group Button Section */}
-      {isCreator && groupDetails.group.established === 0 && (
-        <View style={styles.establishButtonContainer}>
-          <TouchableOpacity
-            style={[styles.establishGroupButton, isEstablishingGroup && styles.disabledButton]}
-            onPress={handleEstablishGroup}
-            disabled={isEstablishingGroup}
-          >
-            {isEstablishingGroup ? (
-              <ActivityIndicator size="small" color={AppColors.white} />
-            ) : (
-              <>
-                <ShieldCheck size={20} color={AppColors.white} style={{ marginRight: 8 }} />
-                <Text style={styles.establishGroupButtonText}>Establish Group</Text>
-              </>
-            )}
-          </TouchableOpacity>
         </View>
       )}
     </ScrollView>
@@ -572,10 +546,10 @@ const styles = StyleSheet.create({
     minWidth: editButtonCalculatedWidth,
     height: editButtonIconSize + (editButtonPaddingVertical * 2),
   },
-  establishedStatusContainer: { // Optional: Style for showing established status
+  establishedStatusContainer: {
     paddingVertical: 8,
     paddingHorizontal: 15,
-    backgroundColor: AppColors.tertiaryBg || AppColors.inputBg, // A slightly different background
+    backgroundColor: AppColors.tertiaryBg || AppColors.inputBg,
     alignItems: 'center',
     marginVertical: 10,
     marginHorizontal: 15,
@@ -616,14 +590,16 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     paddingHorizontal: 5,
   },
+
   memberPfp: {
-    width: memberItemWidth * 0.55,
-    height: memberItemWidth * 0.55,
-    borderRadius: (memberItemWidth * 0.55) / 2,
+    width: memberItemWidth * 0.7, // Made bigger, adjusted from 0.55
+    aspectRatio: 4 / 3, // New ratio: 4:3
+    borderRadius: 8, // Adjust border radius for a rectangular shape with slight rounding
     marginBottom: 8,
     borderWidth: 1.5,
     borderColor: AppColors.primary,
     backgroundColor: AppColors.inputBg,
+    resizeMode: 'cover', // Ensures the image covers the area, cropping if necessary
   },
   memberUsername: {
     color: AppColors.gray300,
@@ -712,7 +688,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   voteOptionsContainer: {
-    // Container for vote options
+
   },
   voteOptionButton: {
     flexDirection: 'row',
@@ -752,7 +728,7 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
     paddingLeft: 10,
   },
-  disabledButton: { // Make sure this is defined for disabled states
+  disabledButton: {
     opacity: 0.6,
   },
   emptyStateText: {
@@ -763,33 +739,12 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingHorizontal: 10,
   },
-  // New Styles for Establish Group Button
-  establishButtonContainer: {
-    marginTop: 30, // Increased top margin for separation
-    marginBottom: 20, // Margin at the bottom of the scroll content
-    marginHorizontal: 15,
-    alignItems: 'center',
-  },
-  establishGroupButton: {
-    backgroundColor: AppColors.green500 || AppColors.primary, // Use green or fallback to primary
-    flexDirection: 'row', // To align icon and text
-    paddingVertical: 14,
-    paddingHorizontal: 25, // Generous padding
-    borderRadius: 28, // Fully rounded ends
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: width * 0.75, // Make it a prominent button
-    shadowColor: AppColors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  establishGroupButtonText: {
-    color: AppColors.white,
-    fontSize: 17, // Slightly larger text
-    fontWeight: 'bold',
-    marginLeft: 8, // If icon is present
+  alreadyCommentedText: { // NEW STYLE
+    flex: 1,
+    color: AppColors.textGray,
+    textAlign: 'center',
+    fontSize: 14.5,
+    paddingVertical: 10,
   },
 })
 

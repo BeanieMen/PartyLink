@@ -263,7 +263,7 @@ const JoinGroupScreen = () => {
   }) => {
     const cardOpacity = useSharedValue(0)
     const cardTranslateY = useSharedValue(20)
-    const groupDisplayName = `${item.group_creator_username}'s Crew`
+    const groupDisplayName = `${item.group_creator_username}'s Group`
 
     useEffect(() => {
       cardOpacity.value = withDelay(index * 100, withTiming(1, { duration: 400 }))
@@ -327,7 +327,7 @@ const JoinGroupScreen = () => {
   }) => {
     const isRequested = userOutgoingRequestGroupId === item.group_id
     const canRequest = !userOutgoingRequestGroupId && !isRequested
-    const groupDisplayName = `${item.creator_username}'s Crew`
+    const groupDisplayName = `${item.creator_username}'s Group`
 
     const cardOpacity = useSharedValue(0)
     const cardTranslateY = useSharedValue(20)

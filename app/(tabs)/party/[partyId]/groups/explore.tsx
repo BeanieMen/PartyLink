@@ -1,6 +1,4 @@
-
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, AlertCircle as LucideAlertCircle, Info, ThumbsDown, ChevronUp } from 'lucide-react-native';
+import { ArrowLeft, AlertCircle as LucideAlertCircle, Info, ThumbsDown, ChevronUp, HelpCircle } from 'lucide-react-native'; // Import HelpCircle for the '?' button
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -26,6 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import Colors, { API_BASE_URL } from '@/constants';
 import { GroupRow, UserRow, GroupDislikeRow } from '@/types/database';
+import InfoPopup from '@/components/InfoPopup';
 
 const AppColors = Colors.dark;
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -59,7 +58,10 @@ const BrowseSceneScreen: React.FC = () => {
 
   const [myGroupMemberDislikes, setMyGroupMemberDislikes] = useState<Record<string, string[]>>({});
   const [myDislikes, setMyDislikes] = useState<string[]>([]);
+  const [isDislikeInfoPopupVisible, setIsDislikeInfoPopupVisible] = useState<boolean>(false);
+  const [isSwipeInfoPopupVisible, setIsSwipeInfoPopupVisible] = useState<boolean>(false); // New state for swipe info popup
 
+  const swipeUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dragTranslationX = useSharedValue(0);
   const dragTranslationY = useSharedValue(0);
   const swipeTranslationX = useSharedValue(0);
@@ -194,6 +196,15 @@ const BrowseSceneScreen: React.FC = () => {
     }
   }, [partyId, authLoaded, userId, myGroupId, checkingMyGroup, fetchBrowsableGroups]);
 
+  useEffect(() => {
+    if (currentGroup && partyId) {
+      router.prefetch({
+        pathname: '/party/[partyId]/groups/[groupId]/summary', // Use the canonical route pattern
+        params: { partyId: partyId, groupId: currentGroup.group_id },
+      });
+    }
+  }, [currentGroup, partyId, router]);
+
   const handleSwipeComplete = useCallback((direction: 'left' | 'right') => {
     const nextIndex = browsableGroups.length > 1 ? (currentGroupIndex + 1) % browsableGroups.length : 0;
 
@@ -237,7 +248,9 @@ const BrowseSceneScreen: React.FC = () => {
   const handleLike = useCallback(async (groupId: string) => {
     if (!userId || !myGroupId) return;
     try {
-      console.log(`Simulating Like network request for group: ${groupId} by user ${userId} from group ${myGroupId}`);
+      // In a real application, this would send a match request
+      console.log(`Simulating Like/Match network request for group: ${groupId} by user ${userId} from group ${myGroupId}`);
+      // If a match occurs (server-side logic), you might navigate to a chat or match screen
     } catch (err: any) {
       console.error('Network Like Error:', err);
     }
@@ -271,12 +284,13 @@ const BrowseSceneScreen: React.FC = () => {
     swipeTranslationY.value = withSpring(0, springConfig);
   }, [currentGroup, browsableGroups.length, myGroupId, swipeTranslationX, swipeTranslationY, springConfig, handleSwipeComplete, handleLike, dragTranslationX, dragTranslationY]);
 
-  // Fixed handleSwipeUp function using the working approach from the first file
   const handleSwipeUp = useCallback(async () => {
     if (!currentGroup || !partyId) {
       console.warn("Cannot open summary: currentGroup or partyId missing.");
       return;
     }
+    dragTranslationX.value = withSpring(0, springConfig);
+    dragTranslationY.value = withSpring(0, springConfig);
     router.push(
       `/party/${partyId}/groups/${currentGroup.group_id}/summary`);
   }, [currentGroup, partyId, router]);
@@ -292,6 +306,7 @@ const BrowseSceneScreen: React.FC = () => {
       dragTranslationY.value = event.translationY;
       swipeTranslationX.value = 0;
       swipeTranslationY.value = 0;
+
     })
     .onEnd((event) => {
       const { translationX, translationY, velocityX, velocityY } = event;
@@ -304,14 +319,15 @@ const BrowseSceneScreen: React.FC = () => {
       const swipedUp = translationY < -swipePositionThresholdY && Math.abs(translationY) > Math.abs(translationX * 0.8);
 
       if (swipedUp && currentGroup) {
-        dragTranslationX.value = withSpring(0, springConfig);
-        dragTranslationY.value = withSpring(0, springConfig, () => runOnJS(handleSwipeUp)());
+        runOnJS(handleSwipeUp)()
+
+
+        // dragTranslationX.value = withSpring(0, springConfig);
+        // dragTranslationY.value = withSpring(0, springConfig);
       } else if (swipedRight && currentGroup && myGroupId) {
-        dragTranslationX.value = withSpring(0, springConfig);
-        dragTranslationY.value = withSpring(0, springConfig, () => runOnJS(handleSwipeRight)());
+        runOnJS(handleSwipeRight)()
       } else if (swipedLeft && currentGroup && myGroupId) {
-        dragTranslationX.value = withSpring(0, springConfig);
-        dragTranslationY.value = withSpring(0, springConfig, () => runOnJS(handleSwipeLeft)());
+        runOnJS(handleSwipeLeft)()
       } else {
         dragTranslationX.value = withSpring(0, springConfig);
         dragTranslationY.value = withSpring(0, springConfig);
@@ -338,7 +354,7 @@ const BrowseSceneScreen: React.FC = () => {
     return (
       <View style={styles.cardInternalPfpContainer}>
         {centralMember ? (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.mainPfpTouchable}
             onPress={() => handleProfilePress(centralMember.user_id)}
             activeOpacity={0.7}
@@ -349,7 +365,7 @@ const BrowseSceneScreen: React.FC = () => {
             />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.mainPfpTouchable}
             disabled={true}
             activeOpacity={1}
@@ -373,7 +389,7 @@ const BrowseSceneScreen: React.FC = () => {
             activeOpacity={0.7}
           >
             <Image
-              source={{ uri:`${API_BASE_URL}/user/${member.user_id}/profile-picture` }}
+              source={{ uri: `${API_BASE_URL}/user/${member.user_id}/profile-picture` }}
               style={styles.satellitePfpOnCard}
             />
           </TouchableOpacity>
@@ -412,7 +428,7 @@ const BrowseSceneScreen: React.FC = () => {
     return (
       <LinearGradient colors={AppColors.darkerBg ? [AppColors.darkerBg, AppColors.secondaryBg || AppColors.darkerBg] : ['#1A0C2E', '#2C154F']} style={styles.loadingContainer}>
         <Info size={48} color={AppColors.gray300 || '#8E8E93'} />
-        <Text style={styles.noMoreGroupsText}>You need to be in a group to browse other crews.</Text>
+        <Text style={styles.noMoreGroupsText}>You need to be in a group to browse other groups.</Text>
         <TouchableOpacity style={styles.primaryButton} onPress={() => router.push(partyId ? `/party/${partyId}/groups/join` : '/')}>
           <Text style={styles.primaryButtonText}>Join or Create Group</Text>
         </TouchableOpacity>
@@ -427,7 +443,7 @@ const BrowseSceneScreen: React.FC = () => {
     return (
       <LinearGradient colors={AppColors.darkerBg ? [AppColors.darkerBg, AppColors.secondaryBg || AppColors.darkerBg] : ['#1A0C2E', '#2C154F']} style={styles.loadingContainer}>
         <Info size={48} color={AppColors.gray300 || '#8E8E93'} />
-        <Text style={styles.noMoreGroupsText}>No more crews to browse right now. Check back later!</Text>
+        <Text style={styles.noMoreGroupsText}>No more groups to browse right now. Check back later!</Text>
         <TouchableOpacity style={styles.primaryButton} onPress={() => partyId && userId ? fetchBrowsableGroups(partyId, userId, myGroupId) : router.back()}>
           <Text style={styles.primaryButtonText}>Refresh</Text>
         </TouchableOpacity>
@@ -447,6 +463,31 @@ const BrowseSceneScreen: React.FC = () => {
     );
   }
 
+  const dislikeExplanationContent = (
+    <>
+      <Text style={styles.popupText}>
+        When you dislike a group, other members in your group who are also exploring will be shown your dislike for that group at the top of their Browse screen.
+      </Text>
+      <Text style={styles.popupText}>
+        This helps your group avoid matching with groups you've collectively decided against. Your personal dislike will be visible to your group members on the Browse screen, next to the "Thumbs Down" icon.
+      </Text>
+    </>
+  );
+
+  const swipeExplanationContent = (
+    <>
+      <Text style={styles.popupText}>
+        <Text style={{ fontWeight: 'bold' }}>Swipe Left:</Text> Dislike the group. Your group members will see your dislike for this group.
+      </Text>
+      <Text style={styles.popupText}>
+        <Text style={{ fontWeight: 'bold' }}>Swipe Up:</Text> View the group's detailed summary, including their description, members, and interests.
+      </Text>
+      <Text style={styles.popupText}>
+        <Text style={{ fontWeight: 'bold' }}>Swipe Right:</Text> Send a group chat request to this group. If they also swipe right on your group, a group chat will be initiated!
+      </Text>
+    </>
+  );
+
   return (
     <GestureHandlerRootView style={styles.rootPageContainer}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -455,10 +496,17 @@ const BrowseSceneScreen: React.FC = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.exitButton}>
           <Text style={styles.exitButtonText}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.browseTitle}>Browse the Scene!</Text>
+
+        <View style={styles.titleContainer}>
+          <Text style={styles.browseTitle}>Browse the Scene!</Text>
+          <TouchableOpacity onPress={() => setIsSwipeInfoPopupVisible(true)} style={styles.helpButton}>
+            <HelpCircle size={24} color={AppColors.gray300 || '#8E8E93'} />
+          </TouchableOpacity>
+        </View>
+
 
         <View style={styles.controlsHeader}>
-          <View style={styles.dislikeIndicator}>
+          <TouchableOpacity onPress={() => setIsDislikeInfoPopupVisible(true)} style={styles.dislikeIndicator}>
             <ThumbsDown
               size={32}
               color={AppColors.textGray || '#333333'}
@@ -488,7 +536,7 @@ const BrowseSceneScreen: React.FC = () => {
                 return <Text style={styles.noDislikesText}>None</Text>;
               }
             })()}
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.cardOuterContainer}>
@@ -504,7 +552,7 @@ const BrowseSceneScreen: React.FC = () => {
         </View>
 
         <TouchableOpacity onPress={handleSwipeUp} style={styles.swipeUpContainer} activeOpacity={0.7}>
-          <Text style={styles.swipeUpText}>*swipe up to view crew info</Text>
+          <Text style={styles.swipeUpText}>*swipe up to view group info</Text>
           <View style={styles.swipeUpLines}>
             <View style={styles.swipeUpLine} />
             <View style={styles.swipeUpLine} />
@@ -513,13 +561,32 @@ const BrowseSceneScreen: React.FC = () => {
         </TouchableOpacity>
 
       </LinearGradient>
+
+      {/* InfoPopup for Dislike Explanation */}
+      <InfoPopup
+        isVisible={isDislikeInfoPopupVisible}
+        onClose={() => setIsDislikeInfoPopupVisible(false)}
+        title="How Dislike Works"
+        content={dislikeExplanationContent}
+      />
+
+      {/* InfoPopup for Swipe Explanation */}
+      <InfoPopup
+        isVisible={isSwipeInfoPopupVisible}
+        onClose={() => setIsSwipeInfoPopupVisible(false)}
+        title="How to Browse"
+        content={swipeExplanationContent}
+      />
     </GestureHandlerRootView>
   );
 };
 const styles = StyleSheet.create({
   rootPageContainer: {
     flex: 1,
-    backgroundColor: AppColors.darkerBg || '#000000',
+    backgroundColor: AppColors.primaryBg || '#000000',
+  },
+  gestureContainer: {
+    flex: 1,
   },
   sceneContainer: {
     flex: 1,
@@ -543,13 +610,24 @@ const styles = StyleSheet.create({
     color: AppColors.gray300 || '#8E8E93',
     fontSize: 16,
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 30,
+    marginBottom: 20,
+    position: 'relative',
+  },
   browseTitle: {
     color: AppColors.white || '#FFFFFF',
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginTop: 30,
-    marginBottom: 20,
+  },
+  helpButton: {
+    position: 'absolute',
+    right: 0,
+    padding: 5,
   },
   controlsHeader: {
     flexDirection: 'row',
@@ -566,7 +644,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     minHeight: 56,
-    shadowColor: AppColors.black,
+    shadowColor: AppColors.black || '#000000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 2,
@@ -614,11 +692,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  mainPfpTouchable: {
+
+ mainPfpTouchable: {
     position: 'absolute',
-    width: screenWidth * 0.25,
-    height: screenWidth * 0.25,
-    borderRadius: (screenWidth * 0.25) / 2,
+    width: screenWidth * 0.25, // Current main PFP size
+    height: screenWidth * 0.25, // Current main PFP size
+    borderRadius: (screenWidth * 0.25) / 2, // Current main PFP size
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 5,
@@ -626,40 +705,41 @@ const styles = StyleSheet.create({
   mainPfpOnCard: {
     width: '100%',
     height: '100%',
-    borderRadius: (screenWidth * 0.25) / 2,
+    borderRadius: (screenWidth * 0.25) / 2, // Current main PFP size
     backgroundColor: AppColors.gray200 || '#E5E5EA',
     borderWidth: 3,
     borderColor: AppColors.white || '#FFFFFF',
   },
   satellitePfpTouchable: {
     position: 'absolute',
-    width: screenWidth * 0.12,
-    height: screenWidth * 0.12,
-    borderRadius: (screenWidth * 0.12) / 2,
+    width: screenWidth * 0.25, // CHANGED: Now matches main PFP size
+    height: screenWidth * 0.25, // CHANGED: Now matches main PFP size
+    borderRadius: (screenWidth * 0.25) / 2, // CHANGED: Now matches main PFP size
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 3,
   },
   satellitePfpLeft: {
-    left: screenWidth * 0.15,
-    top: '40%',
+    left: screenWidth * 0.15, // Retained original position, might cause overlap
+    top: '40%', // Retained original position, might cause overlap
   },
   satellitePfpRight: {
-    right: screenWidth * 0.15,
-    top: '40%',
+    right: screenWidth * 0.15, // Retained original position, might cause overlap
+    top: '40%', // Retained original position, might cause overlap
   },
   satellitePfpBottom: {
-    bottom: screenWidth * 0.12,
-    alignSelf: 'center',
+    bottom: screenWidth * 0.12, // Retained original position, might cause overlap
+    alignSelf: 'center', // Retained original position, might cause overlap
   },
   satellitePfpOnCard: {
     width: '100%',
     height: '100%',
-    borderRadius: (screenWidth * 0.12) / 2,
+    borderRadius: (screenWidth * 0.25) / 2, // CHANGED: Now matches main PFP size
     backgroundColor: AppColors.gray200 || '#E5E5EA',
     borderWidth: 2,
     borderColor: AppColors.white || '#FFFFFF',
   },
+
   swipeUpContainer: {
     alignItems: 'center',
     paddingVertical: 15,
@@ -734,6 +814,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  popupText: {
+    fontSize: 16,
+    marginBottom: 10,
+    textAlign: 'center',
+    color: AppColors.gray300 || '#8E8E93',
+    lineHeight: 22,
   },
 });
 export default BrowseSceneScreen;

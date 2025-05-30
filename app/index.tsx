@@ -242,7 +242,7 @@ const IndexPage = () => {
   if (!isLoaded && !isSignedIn) {
     return (
       <LinearGradient
-        colors={[Colors.dark.primaryBg, Colors.dark.secondaryBg, Colors.dark.darkerBg]}
+        colors={[Colors.dark.primaryBg, Colors.dark.darkerBg]}
         style={styles.fullScreenLoadingContainer}
       >
         <ActivityIndicator size="large" color={Colors.dark.pink400} />

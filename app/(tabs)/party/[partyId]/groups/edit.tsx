@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ActivityIndicator, Alert, FlatList, Image, Platform,
-} from "react-native"; // ScrollView removed as it's replaced by FlatList
+} from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import { ArrowLeft, UserPlus, Trash2, PlusCircle, Save, AlertCircle } from "lucide-react-native";
@@ -18,16 +18,16 @@ const PageColors = {
 interface FoundUser extends UserRow { isAlreadyMember?: boolean; isInvited?: boolean; }
 interface EditableQuestion extends QuestionRow { isNew?: boolean; localText?: string; }
 
-// Define types for the main FlatList sections
+
 const MainListSectionTypes = {
   INVITE_MEMBERS: 'INVITE_MEMBERS',
   QUESTIONS: 'QUESTIONS',
 };
 
-// Data for the main FlatList, defining the order of sections
+
 const screenLayoutData = [
   { type: MainListSectionTypes.INVITE_MEMBERS, id: 'invite_section_card' },
-  { type: MainListSectionTypes.QUESTIONS, id: 'questions_section_card' },
+  // { type: MainListSectionTypes.QUESTIONS, id: 'questions_section_card' },
 ];
 
 const GroupEditsScreen: React.FC = () => {
@@ -204,7 +204,7 @@ const GroupEditsScreen: React.FC = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/group/${groupDetails.group_id}/requests/${targetUserId}/respond`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ response: action }), // Corrected key to 'response' as per user's code
+        body: JSON.stringify({ response: action }),
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({ message: 'Failed to process request.' }));
@@ -253,7 +253,7 @@ const GroupEditsScreen: React.FC = () => {
 
       const currentQuestionIds = new Set(questions.map(q => q.question_id));
       const questionIdsToDelete = originalQuestions
-        .filter(oq => !currentQuestionIds.has(oq.question_id) && !(oq as EditableQuestion).isNew) // .isNew check is for client-side state, originalQuestions from DB shouldn't have it true.
+        .filter(oq => !currentQuestionIds.has(oq.question_id) && !(oq as EditableQuestion).isNew)
         .map(oq => oq.question_id);
 
       const payload = {
@@ -365,8 +365,8 @@ const GroupEditsScreen: React.FC = () => {
                 data={searchResults}
                 renderItem={renderSearchResultItem}
                 keyExtractor={(user) => user.user_id}
-                style={styles.searchResultsList} // maxHeight will clip if content overflows
-                scrollEnabled={false} // Key change to resolve warning
+                style={styles.searchResultsList}
+                scrollEnabled={false}
               />
             )}
             {!isSearchingUsers && searchResults.length === 0 && searchQuery.trim() !== "" && (
@@ -394,8 +394,8 @@ const GroupEditsScreen: React.FC = () => {
                 data={questions}
                 renderItem={renderQuestionItem}
                 keyExtractor={(question) => question.question_id}
-                style={styles.questionsList} // maxHeight will clip if content overflows
-                scrollEnabled={false} // Key change to resolve warning
+                style={styles.questionsList}
+                scrollEnabled={false}
               />
             ) : (
               <Text style={styles.emptyStateText}>No questions yet. Add some for your group!</Text>
@@ -426,19 +426,19 @@ const GroupEditsScreen: React.FC = () => {
   }
 
   if (!groupDetails) {
-    // This case is handled by the fetchUserGroup logic navigating away or alerting.
-    // Adding a fallback UI here in case navigation doesn't happen immediately or fails.
+
+
     return (
       <View style={styles.loaderContainer}>
         <Stack.Screen options={{ headerShown: false }} />
-         <View style={styles.header}>
+        <View style={styles.header}>
           <TouchableOpacity onPress={() => partyId ? router.replace(`/party/${partyId}`) : router.back()} style={styles.backButton}>
             <ArrowLeft size={24} color={PageColors.textWhite} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Error</Text>
           <View style={{ width: 24 }} />
         </View>
-        <AlertCircle size={48} color={PageColors.warningText} style={{ marginTop: 50 }}/>
+        <AlertCircle size={48} color={PageColors.warningText} style={{ marginTop: 50 }} />
         <Text style={styles.errorText}>Could not load group information or no group found.</Text>
         <TouchableOpacity onPress={() => partyId ? router.replace(`/party/${partyId}`) : router.back()} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Back to Event</Text>
@@ -448,9 +448,7 @@ const GroupEditsScreen: React.FC = () => {
   }
 
   if (!isAuthorized) {
-    // This case is also handled by fetchUserGroup navigating away.
-    // Adding a fallback UI.
-     return (
+    return (
       <View style={styles.loaderContainer}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.header}>
@@ -486,7 +484,7 @@ const GroupEditsScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: PageColors.background },
-  scrollContentContainer: { paddingBottom: 50 }, // Used by main FlatList now
+  scrollContentContainer: { paddingBottom: 50 },
   loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: PageColors.background, paddingHorizontal: 20 },
   loaderText: { color: PageColors.textWhite, marginTop: 10, textAlign: 'center' },
   errorText: { color: PageColors.warningText, fontSize: 16, textAlign: 'center', marginVertical: 15 },
@@ -508,12 +506,10 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'ios' ? 12 : 10, borderRadius: 8, fontSize: 15, marginRight: 10,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)'
   },
-  // searchButton style was present but not used, can be removed if not planned for use.
-  // searchButton: {
-  //   paddingHorizontal: 12, paddingVertical: 10, backgroundColor: PageColors.primary, borderRadius: 8,
-  //   minHeight: Platform.OS === 'ios' ? 42 : 40, justifyContent: 'center', alignItems: 'center'
-  // },
-  searchResultsList: { maxHeight: 180 }, // This will now clip content if it overflows, as scrollEnabled is false
+  searchResultsList: {
+    maxHeight: 180,
+    flexGrow: 0,
+  },
   searchResultItem: { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: PageColors.inputBackground },
   userPfp: { width: 36, height: 36, borderRadius: 18, marginRight: 10, backgroundColor: PageColors.textGray },
   usernameText: { flex: 1, color: PageColors.textWhite, fontSize: 15 },
@@ -523,7 +519,7 @@ const styles = StyleSheet.create({
   acceptRequestButton: { backgroundColor: PageColors.primary, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 5, marginRight: 5 },
   declineRequestButton: { backgroundColor: PageColors.accent, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 5 },
   requestButtonText: { color: PageColors.textWhite, fontSize: 14, fontWeight: 'bold', minWidth: 40, textAlign: 'center' },
-  questionsList: { maxHeight: 350 }, // This will now clip content if it overflows, as scrollEnabled is false
+  questionsList: { maxHeight: 350 },
   questionItem: {
     flexDirection: "row", alignItems: "center", marginBottom: 10, backgroundColor: PageColors.inputBackground,
     borderRadius: 8, paddingLeft: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)'

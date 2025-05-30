@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
+import React from 'react'
 import {
   View,
   Text,
@@ -21,6 +22,7 @@ import {
   Link as LinkIcon,
   AlertCircle,
   ChevronLeft,
+  UserPlus // Import for the new friend icon
 } from 'lucide-react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 
@@ -66,7 +68,7 @@ const parseUserDescription = (descriptionString: string | null): ParsedDescripti
 
 const UserProfileScreen: React.FC = () => {
   const router = useRouter()
-  const { userId } = useLocalSearchParams<{ userId: string }>();
+  const { partyId, userId } = useLocalSearchParams<{ partyId: string, userId: string }>();
   const { userId: myUserId } = useAuth() // This is the current logged-in user's ID
 
   const [user, setUser] = useState<UserRow | null>(null)
@@ -77,6 +79,9 @@ const UserProfileScreen: React.FC = () => {
   // State to hold the chat session status
   const [chatStatus, setChatStatus] = useState<'none' | 'pending' | 'accepted' | 'declined' | null>(null);
   const [chatSessionId, setChatSessionId] = useState<string>()
+  // New state for friend request status
+  const [friendStatus, setFriendStatus] = useState<'none' | 'pending' | 'accepted' | 'declined' | null>(null);
+
   // Effect to fetch user data
   useEffect(() => {
     if (!userId) {
@@ -121,7 +126,7 @@ const UserProfileScreen: React.FC = () => {
 
     const fetchChatStatus = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/chat/status?user1_id=${myUserId}&user2_id=${userId}`);
+        const response = await fetch(`${API_BASE_URL}/chat/status?user1_id=${myUserId}&user2_id=${userId}&party_id=${partyId}`);
         if (!response.ok) {
           if (response.status === 404) {
             setChatStatus('none'); // No session found
@@ -142,7 +147,7 @@ const UserProfileScreen: React.FC = () => {
     };
 
     fetchChatStatus();
-  }, [userId, myUserId]); // Re-run when userId or myUserId changes
+  }, [userId, myUserId, partyId]); // Re-run when userId or myUserId changes
 
   const handleRequestToChat = async () => {
     if (!userId || !myUserId) {
@@ -171,7 +176,7 @@ const UserProfileScreen: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ requester_user_id: myUserId, requestee_user_id: userId })
+        body: JSON.stringify({ requester_user_id: myUserId, requestee_user_id: userId, party_id: partyId})
       })
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -191,6 +196,7 @@ const UserProfileScreen: React.FC = () => {
       setChatStatus('none'); // Revert status if there was an error
     }
   }
+
 
   const openLink = (url: string) => {
     let fullUrl = url
@@ -313,19 +319,21 @@ const UserProfileScreen: React.FC = () => {
       <View style={styles.profileCard}>
         <View style={styles.cardHeader}>
           <Image
-            source={{ uri: `${API_BASE_URL}/user/${userId}/profile-picture` || 'https://via.placeholder.com/100/A020F0/FFFFFF?text=P' }}
+            source={{ uri: `${API_BASE_URL}/user/${userId}/profile-picture`}}
             style={styles.smallAvatar}
           />
-          {/* Conditionally render and style the chat request button */}
-          {chatButtonText !== '' && ( // Only show if not empty (i.e., not self-profile)
-            <TouchableOpacity
-              onPress={handleRequestToChat}
-              style={chatButtonStyles}
-              disabled={isChatButtonDisabled}
-            >
-              <Text style={chatButtonTextStyle}>{chatButtonText}</Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.buttonContainer}>
+            {chatButtonText !== '' && ( // Only show if not empty (i.e., not self-profile)
+              <TouchableOpacity
+                onPress={handleRequestToChat}
+                style={chatButtonStyles}
+                disabled={isChatButtonDisabled}
+              >
+                <Text style={chatButtonTextStyle}>{chatButtonText}</Text>
+              </TouchableOpacity>
+            )}
+           
+          </View>
         </View>
 
         <View style={styles.userInfoSection}>
@@ -448,6 +456,10 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     borderWidth: 2,
     borderColor: AppColors.white,
+  },
+  buttonContainer: {
+    flexDirection: 'row', // Arrange buttons horizontally
+    gap: 10, // Space between buttons
   },
   requestedButton: {
     backgroundColor: AppColors.white,
