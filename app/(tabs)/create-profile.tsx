@@ -18,15 +18,14 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Camera, CheckCircle, Save, UserCircle, HelpCircle, LogOut } from 'lucide-react-native'
 import Spinner from 'react-native-loading-spinner-overlay'
 
-import Colors, { API_BASE_URL } from '@/constants'
-import InfoPopup from '@/components/InfoPopup';
+import Colors, { API_BASE_URL } from '@/constants' // Assuming these are correctly set up
+import InfoPopup from '@/components/InfoPopup'; // Assuming this is correctly set up
 
 const CreateProfileScreen = () => {
   const router = useRouter()
   const { userId, isSignedIn, isLoaded, signOut } = useAuth()
 
   const [username, setUsername] = useState('')
-  // Removed description state
   const [profileImage, setProfileImage] = useState<ImagePicker.ImagePickerAsset | null>(null)
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null)
 
@@ -34,7 +33,11 @@ const CreateProfileScreen = () => {
   const [school, setSchool] = useState('')
   const [portraitImage, setPortraitImage] = useState<ImagePicker.ImagePickerAsset | null>(null)
   const [portraitImageUri, setPortraitImageUri] = useState<string | null>(null)
-  const [socialsInput, setSocialsInput] = useState('') // Consolidated social links
+  
+  // New state for Instagram link
+  const [instagramLink, setInstagramLink] = useState('');
+  const [socialsInput, setSocialsInput] = useState('') // For other social links
+  
   const [isPrivate, setIsPrivate] = useState(false)
   const [isPrivateInfoPopupVisible, setIsPrivateInfoPopupVisible] = useState(false);
 
@@ -50,19 +53,23 @@ const CreateProfileScreen = () => {
         return;
       }
       try {
+        // Check if user profile already exists
         const userRes = await fetch(`${API_BASE_URL}/user/${userId}`);
         if (userRes.ok && userRes.headers.get("content-type")?.includes("application/json")) {
           const userData = await userRes.json();
-          if (userData && (Object.keys(userData).length > 1 || userData.username)) {
-            router.replace('/dashboard');
+          // If user data exists (e.g., has a username or more than just a default ID field), redirect
+          if (userData && (Object.keys(userData).length > 1 || userData.username)) { 
+            router.replace('/dashboard'); // Or your main app screen
           }
         } else if (userRes.status === 404) {
-          // User not found, proceed to create profile
+          // User not found, normal flow for create profile
         } else {
+          // Handle other non-OK statuses or unexpected responses
           console.warn("Failed to fetch user data or unexpected response format:", userRes.status);
         }
       } catch (e) {
         console.error("Error checking user status:", e);
+        // Potentially alert user or handle gracefully
       }
     }
     checkStatus()
@@ -76,7 +83,7 @@ const CreateProfileScreen = () => {
     }
 
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, // Corrected type
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -96,7 +103,7 @@ const CreateProfileScreen = () => {
     }
 
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, // Corrected type
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [3, 4],
       quality: 0.7,
@@ -110,9 +117,10 @@ const CreateProfileScreen = () => {
 
   const validateUsername = (uname: string) => {
     if (!uname.trim()) return 'Name is required.'
-    if (/\s/.test(uname)) return 'Name cannot contain spaces.' // Assuming "Name" implies a single word like username
+    if (/\s/.test(uname)) return 'Name cannot contain spaces.'
     if (uname.length < 3) return 'Name must be at least 3 characters long.'
     if (uname.length > 20) return 'Name cannot exceed 20 characters.'
+    if (!/^[a-zA-Z0-9_]+$/.test(uname)) return 'Name can only contain letters, numbers, and underscores.'
     return null
   }
 
@@ -122,7 +130,6 @@ const CreateProfileScreen = () => {
       return
     }
 
-    // Validation for required fields
     const usernameError = validateUsername(username)
     if (usernameError) {
       Alert.alert('Validation Error', usernameError)
@@ -144,21 +151,26 @@ const CreateProfileScreen = () => {
 
     const formData = new FormData()
     formData.append('userId', userId)
-    formData.append('username', username.trim().toLowerCase()) // Keep lowercase for storage/lookup
+    formData.append('username', username.trim().toLowerCase())
 
     if (age.trim()) {
       const ageNum = parseInt(age, 10);
       if (isNaN(ageNum) || ageNum <= 10 || ageNum > 100) {
-        Alert.alert('Validation Error', 'Please enter a valid age (e.g., 10-100), or leave it blank.');
+        Alert.alert('Validation Error', 'Please enter a valid age (e.g., 11-99), or leave it blank.');
         setLoading(false);
         return;
       }
       formData.append('age', age.trim());
     }
 
-    // description is removed
     if (school.trim()) formData.append('school', school.trim());
 
+    // Append Instagram link
+    if (instagramLink.trim()) {
+      formData.append('instagram_link', instagramLink.trim());
+    }
+
+    // Append other social links
     if (socialsInput.trim()) {
       const linksArray = socialsInput
         .split(/[\s,;\n]+/)
@@ -168,20 +180,19 @@ const CreateProfileScreen = () => {
             link.length > 0 &&
             (link.startsWith('http://') ||
               link.startsWith('https://') ||
-              /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}([:/?#].*)?$/.test(link))
+              /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}([:/?#].*)?$/.test(link)) // Basic URL-like pattern
         );
 
       if (linksArray.length > 0) {
         formData.append('socials', linksArray.join(','));
       }
     }
-    formData.append('is_private', isPrivate ? 'true' : 'false')
+    formData.append('is_private', isPrivate.toString()) // Send as 'true' or 'false' string
 
-    // Profile Picture (Avatar)
     if (profileImage && profileImage.uri) {
       const uriParts = profileImage.uri.split('.')
       const fileType = uriParts[uriParts.length - 1]
-      const fileName = profileImage.fileName || `profile_${userId}.${fileType}`
+      const fileName = profileImage.fileName || `profile_${userId}_${Date.now()}.${fileType}`
 
       formData.append('profilePicture', {
         uri: Platform.OS === 'android' ? profileImage.uri : profileImage.uri.replace('file://', ''),
@@ -190,11 +201,10 @@ const CreateProfileScreen = () => {
       } as any)
     }
 
-    // Portrait Picture
     if (portraitImage && portraitImage.uri) {
       const uriParts = portraitImage.uri.split('.')
       const fileType = uriParts[uriParts.length - 1]
-      const fileName = portraitImage.fileName || `portrait_${userId}.${fileType}`
+      const fileName = portraitImage.fileName || `portrait_${userId}_${Date.now()}.${fileType}`
 
       formData.append('portraitPicture', {
         uri: Platform.OS === 'android' ? portraitImage.uri : portraitImage.uri.replace('file://', ''),
@@ -207,13 +217,14 @@ const CreateProfileScreen = () => {
       const response = await fetch(`${API_BASE_URL}/user/profile/create`, {
         method: 'POST',
         body: formData,
+        // Add headers if needed, e.g., for auth token if not handled by a global interceptor
       })
 
-      const responseData = await response.json()
+      const responseData = await response.json().catch(() => ({ success: false, message: "Invalid JSON response"}));
 
       if (response.ok && responseData.success) {
         Alert.alert('Profile Created!', 'Your profile has been successfully set up.')
-        router.replace('/dashboard')
+        router.replace('/dashboard') // Navigate to dashboard or main app screen
       } else {
         setError(responseData.message || responseData.error || 'Failed to create profile. Please try again.')
         Alert.alert('Error', responseData.message || responseData.error || 'An unknown error occurred.')
@@ -230,7 +241,7 @@ const CreateProfileScreen = () => {
   if (!isLoaded || (isLoaded && !isSignedIn && !userId)) {
     return (
       <LinearGradient
-        colors={[Colors.dark.primaryBg, Colors.dark.secondaryBg]}
+        colors={[Colors.dark.primaryBg, Colors.dark.secondaryBg]} // Ensure Colors are defined
         style={styles.loadingContainer}
       >
         <ActivityIndicator size="large" color={Colors.dark.pink500} />
@@ -243,10 +254,10 @@ const CreateProfileScreen = () => {
       <Text style={styles.popupText}>
         When your account is **private**, your profile and activity will only be visible to:
       </Text>
-      <Text style={styles.popupText}>
+      <Text style={styles.popupListItem}>
         • Users you are friends with.
       </Text>
-      <Text style={styles.popupText}>
+      <Text style={styles.popupListItem}>
         • Members of groups you have matched with and are in a group chat with.
       </Text>
       <Text style={styles.popupText}>
@@ -312,13 +323,15 @@ const CreateProfileScreen = () => {
           <Text style={styles.label}>Name*</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., Alex"
+            placeholder="e.g., Alex_Link"
             value={username}
-            onChangeText={(text) => setUsername(text.charAt(0).toUpperCase() + text.slice(1))} // Auto-capitalize first letter
+            // onChangeText={(text) => setUsername(text.charAt(0).toUpperCase() + text.slice(1))}
+            onChangeText={(text) => setUsername(text)} // Let users type freely, validation handles format.
             placeholderTextColor={Colors.dark.gray400}
-            autoCapitalize="words" // Capitalize first letter of each word
+            // autoCapitalize="words" - Username might not need this, or could be "none"
+            autoCapitalize="none"
           />
-          <Text style={styles.inputHint}>3-20 characters, no spaces.</Text>
+          <Text style={styles.inputHint}>3-20 characters. Letters, numbers, underscores. No spaces.</Text>
         </View>
 
         <View style={styles.inputGroup}>
@@ -346,11 +359,25 @@ const CreateProfileScreen = () => {
           />
         </View>
 
+        {/* New Instagram Link Section */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Social Links (Optional)</Text>
+          <Text style={styles.label}>Instagram Link (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g., instagram.com/yourprofile or your_username"
+            value={instagramLink}
+            onChangeText={setInstagramLink}
+            placeholderTextColor={Colors.dark.gray400}
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Other Social Links (Optional)</Text>
           <TextInput
             style={[styles.input, styles.textArea, { height: 120 }]}
-            placeholder="e.g., instagram.com/yourprofile, twitter.com/user"
+            placeholder="e.g., twitter.com/user, linkedin.com/in/user"
             value={socialsInput}
             onChangeText={setSocialsInput}
             placeholderTextColor={Colors.dark.gray400}
@@ -362,30 +389,24 @@ const CreateProfileScreen = () => {
           <Text style={styles.inputHint}>Separate multiple links with a comma, space, or new line.</Text>
         </View>
 
-        <View style={[styles.inputGroup, styles.privateToggleContainer]}>
+        <View style={[styles.inputGroup, styles.privateToggleOuterContainer]}>
           <TouchableOpacity
+            activeOpacity={0.7}
             onPress={() => setIsPrivate(!isPrivate)}
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: 4,
-              borderWidth: 2,
-              borderColor: Colors.dark.gray500,
-              backgroundColor: isPrivate ? Colors.dark.pink500 : 'transparent',
-              marginRight: 12,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
+            style={styles.privateToggleInnerContainer}
           >
-            {isPrivate && <CheckCircle size={18} color={Colors.dark.white} />}
+            <View style={[styles.checkbox, isPrivate && styles.checkboxChecked]}>
+              {isPrivate && <CheckCircle size={16} color={Colors.dark.primaryBg} />}
+            </View>
+            <Text style={styles.privateToggleText}>
+              Make my account private
+            </Text>
           </TouchableOpacity>
-          <Text style={styles.privateToggleText}>
-            Make my account private
-          </Text>
           <TouchableOpacity onPress={() => setIsPrivateInfoPopupVisible(true)} style={styles.helpButton}>
-            <HelpCircle size={20} color={Colors.dark.gray300} />
+            <HelpCircle size={22} color={Colors.dark.gray300} />
           </TouchableOpacity>
         </View>
+
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -425,7 +446,7 @@ const CreateProfileScreen = () => {
 const styles = StyleSheet.create({
   gradientContainer: {
     flex: 1,
-    paddingTop: 20,
+    // paddingTop: 20, // Removed, handled by ScrollView or safe area
   },
   loadingContainer: {
     flex: 1,
@@ -435,7 +456,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: Platform.OS === 'ios' ? 70 : 50, // Increased top padding
     paddingBottom: 40,
     paddingHorizontal: 20,
   },
@@ -444,6 +465,7 @@ const styles = StyleSheet.create({
     top: Platform.OS === 'ios' ? 50 : 30,
     right: 20,
     zIndex: 10,
+    padding: 5, // Easier to tap
   },
   headerContainer: {
     alignItems: 'center',
@@ -460,28 +482,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.dark.gray300,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 15, // Increased margin
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.dark.gray100,
+    color: Colors.dark.gray100, // Ensure Colors.dark.gray100 is defined
     alignSelf: 'flex-start',
     maxWidth: 400,
     width: '100%',
     marginBottom: 10,
-    marginTop: 15,
+    marginTop: 20, // Increased margin
   },
   imagePicker: {
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: Colors.dark.inputBg,
+    backgroundColor: Colors.dark.inputBg, // Ensure Colors.dark.inputBg is defined
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 25, // Increased margin
     borderWidth: 2,
-    borderColor: Colors.dark.pink300,
+    borderColor: Colors.dark.pink300, // Ensure Colors.dark.pink300 is defined
     overflow: 'hidden',
   },
   profileImagePreview: {
@@ -497,7 +519,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
     borderWidth: 2,
-    borderColor: Colors.dark.blue300,
+    borderColor: Colors.dark.blue300, // Ensure Colors.dark.blue300 is defined
     borderRadius: 10,
     overflow: 'hidden',
   },
@@ -518,35 +540,35 @@ const styles = StyleSheet.create({
   },
   imagePickerSubtext: {
     marginTop: 4,
-    color: Colors.dark.gray400,
+    color: Colors.dark.gray400, // Ensure Colors.dark.gray400 is defined
     fontSize: 11,
     textAlign: 'center',
   },
   inputGroup: {
     width: '100%',
     maxWidth: 400,
-    marginBottom: 18,
+    marginBottom: 20, // Increased margin
   },
   label: {
     fontSize: 14,
-    color: Colors.dark.gray200,
+    color: Colors.dark.gray200, // Ensure Colors.dark.gray200 is defined
     marginBottom: 8,
     fontWeight: '500',
   },
   input: {
     backgroundColor: Colors.dark.inputBg,
     color: Colors.dark.text,
-    height: 50,
+    height: 52, // Slightly taller
     borderRadius: 10,
     paddingHorizontal: 15,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.gray700,
+    borderColor: Colors.dark.gray700, // Ensure Colors.dark.gray700 is defined
   },
   inputHint: {
     fontSize: 12,
     color: Colors.dark.gray400,
-    marginTop: 5,
+    marginTop: 6, // Increased margin
     marginLeft: 2,
   },
   textArea: {
@@ -554,21 +576,41 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     paddingTop: 15,
   },
-  privateToggleContainer: {
+  privateToggleOuterContainer: { // Renamed for clarity
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between', // Help icon to the right
     width: '100%',
     maxWidth: 400,
-    marginBottom: 20,
+    marginBottom: 25, // Increased margin
+    paddingVertical: 5,
+  },
+  privateToggleInnerContainer: { // For checkbox and text
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: Colors.dark.gray500, // Ensure Colors.dark.gray500 is defined
+    backgroundColor: 'transparent',
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.dark.pink500,
+    borderColor: Colors.dark.pink500,
   },
   privateToggleText: {
     color: Colors.dark.gray200,
-    fontSize: 14,
-    marginRight: 10,
+    fontSize: 15, // Slightly larger
+    // marginRight: 10, // Handled by space-between on outer container
   },
   helpButton: {
-    padding: 5,
+    padding: 8, // Increased tap area
   },
   saveButton: {
     backgroundColor: Colors.dark.pink500,
@@ -581,40 +623,49 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     marginTop: 25,
-    shadowColor: Colors.dark.pink700,
+    shadowColor: Colors.dark.pink700, // Ensure Colors.dark.pink700 is defined
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 6,
   },
   saveButtonDisabled: {
-    backgroundColor: Colors.dark.pink300,
+    backgroundColor: Colors.dark.pink300, // Ensure Colors.dark.pink300 is defined
     elevation: 0,
     shadowOpacity: 0,
   },
   saveButtonText: {
-    color: Colors.dark.white,
+    color: Colors.dark.white, // Ensure Colors.dark.white is defined
     fontSize: 18,
     fontWeight: '600',
   },
   errorText: {
-    color: Colors.dark.red,
+    color: Colors.dark.red, // Ensure Colors.dark.red is defined
     textAlign: 'center',
     marginBottom: 15,
-    marginTop: -5,
+    marginTop: -10, // Adjusted
     width: '100%',
     maxWidth: 400,
+    fontSize: 14,
   },
   spinnerTextStyle: {
     color: '#FFF',
     fontSize: 16,
   },
   popupText: {
-    fontSize: 16,
+    fontSize: 15,
     marginBottom: 10,
-    textAlign: 'center',
+    textAlign: 'left',
     color: Colors.dark.gray300,
     lineHeight: 22,
+  },
+  popupListItem: {
+    fontSize: 15,
+    color: Colors.dark.gray300,
+    lineHeight: 22,
+    marginBottom: 8,
+    paddingLeft: 5,
+    textAlign: 'left',
   }
 })
 

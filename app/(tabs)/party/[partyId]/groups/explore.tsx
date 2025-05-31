@@ -693,52 +693,57 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 
- mainPfpTouchable: {
+  mainPfpTouchable: {
     position: 'absolute',
-    width: screenWidth * 0.25, // Current main PFP size
-    height: screenWidth * 0.25, // Current main PFP size
-    borderRadius: (screenWidth * 0.25) / 2, // Current main PFP size
+    width: screenWidth * 0.25,
+    height: screenWidth * 0.25,
+    borderRadius: (screenWidth * 0.25) / 2,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 5,
+    zIndex: 5, // Main PFP on top
   },
   mainPfpOnCard: {
     width: '100%',
     height: '100%',
-    borderRadius: (screenWidth * 0.25) / 2, // Current main PFP size
+    borderRadius: (screenWidth * 0.25) / 2,
     backgroundColor: AppColors.gray200 || '#E5E5EA',
     borderWidth: 3,
     borderColor: AppColors.white || '#FFFFFF',
   },
   satellitePfpTouchable: {
     position: 'absolute',
-    width: screenWidth * 0.25, // CHANGED: Now matches main PFP size
-    height: screenWidth * 0.25, // CHANGED: Now matches main PFP size
-    borderRadius: (screenWidth * 0.25) / 2, // CHANGED: Now matches main PFP size
+    width: screenWidth * 0.25,
+    height: screenWidth * 0.25,
+    borderRadius: (screenWidth * 0.25) / 2,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 3,
+    zIndex: 3, // Satellite PFPs behind main if any slight overlap
   },
   satellitePfpLeft: {
-    left: screenWidth * 0.15, // Retained original position, might cause overlap
-    top: '40%', // Retained original position, might cause overlap
+    left: 0, // MODIFIED
+    top: screenWidth * 0.25, // MODIFIED
   },
   satellitePfpRight: {
-    right: screenWidth * 0.15, // Retained original position, might cause overlap
-    top: '40%', // Retained original position, might cause overlap
+    left: screenWidth * 0.5, // MODIFIED
+    top: screenWidth * 0.25, // MODIFIED
+    // If you prefer using 'right' property:
+    // right: 0,
+    // top: screenWidth * 0.25,
   },
   satellitePfpBottom: {
-    bottom: screenWidth * 0.12, // Retained original position, might cause overlap
-    alignSelf: 'center', // Retained original position, might cause overlap
+    left: screenWidth * 0.25, // MODIFIED - This centers it horizontally
+    top: screenWidth * 0.5, // MODIFIED
+    // alignSelf: 'center', // REMOVED - 'left' now handles horizontal centering
   },
   satellitePfpOnCard: {
     width: '100%',
     height: '100%',
-    borderRadius: (screenWidth * 0.25) / 2, // CHANGED: Now matches main PFP size
+    borderRadius: (screenWidth * 0.25) / 2,
     backgroundColor: AppColors.gray200 || '#E5E5EA',
     borderWidth: 2,
     borderColor: AppColors.white || '#FFFFFF',
   },
+
 
   swipeUpContainer: {
     alignItems: 'center',

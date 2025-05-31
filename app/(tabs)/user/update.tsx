@@ -20,6 +20,7 @@ import Spinner from 'react-native-loading-spinner-overlay'
 
 import Colors, { API_BASE_URL } from '@/constants' // Assuming API_BASE_URL is here
 import InfoPopup from '@/components/InfoPopup'   // Assuming InfoPopup is in this path
+import { UserRow } from '@/types/database'
 
 // Mock User Data Structure (for fetching)
 interface UserProfileData {
@@ -61,7 +62,33 @@ const EditProfileScreen = () => {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
 
-  // Fetch existing profile data
+
+interface ParsedDescription {
+  bio: string
+  age: string
+  school: string
+}
+
+const parseUserDescription = (descriptionString: string | null): ParsedDescription => {
+  const result: ParsedDescription = { bio: '', age: '', school: '' }
+  if (!descriptionString) return result
+
+  const parts = descriptionString.split(',')
+  parts.forEach((part) => {
+    const firstColonIndex = part.indexOf(':')
+    if (firstColonIndex === -1) return;
+
+    const key = part.substring(0, firstColonIndex)
+    const value = part.substring(firstColonIndex + 1)
+
+    if (key === 'description' && value) result.bio = value.trim()
+    else if (key === 'age' && value) result.age = value.trim()
+    else if (key === 'school' && value) result.school = value.trim()
+  })
+console.log(result)
+  return result
+}
+
   const fetchProfileData = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
@@ -69,17 +96,19 @@ const EditProfileScreen = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/user/${userId}`); // Assuming this endpoint
       if (response.ok) {
-        const data: UserProfileData = await response.json();
+        const data: UserRow = await response.json();
+        const userDescBio = parseUserDescription(data.description)
         setUsername(data.username || ''); // Or setCurrentUsername if not editable
         setCurrentUsername(data.username || '');
-        setDescription(data.description || '');
-        setInstagramLink(data.instagram_link || '');
-        setProfileImageUri(data.profile_picture_url || null);
-        setAge(data.age?.toString() || '');
-        setSchool(data.school || '');
-        setPortraitImageUri(data.portrait_picture_url || null);
-        setSocialsInput(data.socials || '');
-        setIsPrivate(data.is_private || false);
+        console.log(userDescBio.bio)
+        setDescription(userDescBio.bio || '');
+        setInstagramLink(data.socials?.split(',').find(v=>v.startsWith('instagram'))?.split(':')[1] ?? "")
+        setProfileImageUri(`${API_BASE_URL}/user/${data.user_id}/profile-picture`);
+        setAge(userDescBio.age);
+        setSchool(userDescBio.school);
+        setPortraitImageUri(`${API_BASE_URL}/user/${data.user_id}/portrait`);
+        setSocialsInput(data.socials?.split(',').filter(v=>!v.startsWith('instagram')).join(' ') ?? "");
+        setIsPrivate(data.is_private == 1);
         setInitialDataLoaded(true);
       } else if (response.status === 404) {
         Alert.alert("Profile Not Found", "No profile data exists. Redirecting to create profile.", [
