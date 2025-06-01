@@ -1,11 +1,11 @@
-import React from 'react';
-import { Stack, Redirect } from 'expo-router';
-import { useAuth } from '@clerk/clerk-expo';
-import { ActivityIndicator, View } from 'react-native';
-import Colors from '@/constants';
+import React from 'react'
+import { Stack, Redirect } from 'expo-router'
+import { useAuth } from '@clerk/clerk-expo'
+import { ActivityIndicator, View } from 'react-native'
+import Colors from '@/constants'
 
 export default function AppLayout() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth()
 
   if (!isLoaded) {
     return (
@@ -19,11 +19,11 @@ export default function AppLayout() {
       >
         <ActivityIndicator size="large" color={Colors.dark.pink400} />
       </View>
-    );
+    )
   }
 
   if (!isSignedIn) {
-    return <Redirect href="/" />;
+    return <Redirect href="/" />
   }
 
   return (
@@ -36,7 +36,6 @@ export default function AppLayout() {
           headerTintColor: Colors.dark.text,
         }}
       />
-
 
       <Stack.Screen
         name="party/[partyId]/groups/explore"
@@ -68,14 +67,13 @@ export default function AppLayout() {
         }}
       />
 
-        <Stack.Screen
+      <Stack.Screen
         name="user/update"
         options={{
           headerShown: false,
           animation: 'fade',
         }}
       />
-
     </Stack>
-  );
+  )
 }

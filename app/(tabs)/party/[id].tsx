@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -9,9 +9,9 @@ import {
   Alert,
   ScrollView,
   Dimensions,
-} from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { useAuth } from '@clerk/clerk-expo';
+} from 'react-native'
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router'
+import { useAuth } from '@clerk/clerk-expo'
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -21,31 +21,31 @@ import {
   Ticket,
   Share2,
   Heart,
-} from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+} from 'lucide-react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withRepeat,
   Easing,
-} from 'react-native-reanimated';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Colors, { API_BASE_URL } from '@/constants'; // Import Colors
-import { PartyRow } from '@/types/database';
+} from 'react-native-reanimated'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import Colors, { API_BASE_URL } from '@/constants' // Import Colors
+import { PartyRow } from '@/types/database'
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window')
 
 const PartyDetailsScreen: React.FC = () => {
-  const { id } = useLocalSearchParams();
-  const router = useRouter();
-  const { isLoaded, isSignedIn } = useAuth();
-  const [party, setParty] = useState<PartyRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const { userId } = useAuth();
-  const loaderScale = useSharedValue(1);
-  const loaderOpacity = useSharedValue(0.7);
+  const { id } = useLocalSearchParams()
+  const router = useRouter()
+  const { isLoaded, isSignedIn } = useAuth()
+  const [party, setParty] = useState<PartyRow | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const { userId } = useAuth()
+  const loaderScale = useSharedValue(1)
+  const loaderOpacity = useSharedValue(0.7)
 
   useEffect(() => {
     if (loading) {
@@ -53,115 +53,115 @@ const PartyDetailsScreen: React.FC = () => {
         withTiming(1.2, { duration: 750, easing: Easing.inOut(Easing.ease) }),
         -1,
         true,
-      );
+      )
       loaderOpacity.value = withRepeat(
         withTiming(1, { duration: 750, easing: Easing.inOut(Easing.ease) }),
         -1,
         true,
-      );
+      )
     } else {
-      loaderScale.value = withTiming(1);
-      loaderOpacity.value = withTiming(1);
+      loaderScale.value = withTiming(1)
+      loaderOpacity.value = withTiming(1)
     }
-  }, [loading, loaderScale, loaderOpacity]);
+  }, [loading, loaderScale, loaderOpacity])
 
   const animatedLoaderStyle = useAnimatedStyle(() => ({
     transform: [{ scale: loaderScale.value }],
     opacity: loaderOpacity.value,
-  }));
+  }))
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
-      router.replace('/');
-      return;
+      router.replace('/')
+      return
     }
 
-    if (!id) return;
+    if (!id) return
 
     const fetchParty = async () => {
       try {
-        setLoading(true);
+        setLoading(true)
 
-        const cacheKey = `party_details_${id}`;
+        const cacheKey = `party_details_${id}`
         try {
-          const cached = await AsyncStorage.getItem(cacheKey);
+          const cached = await AsyncStorage.getItem(cacheKey)
           if (cached) {
-            setParty(JSON.parse(cached));
+            setParty(JSON.parse(cached))
           }
         } catch {
-          await AsyncStorage.removeItem(cacheKey);
+          await AsyncStorage.removeItem(cacheKey)
         }
 
-        const response = await fetch(`${API_BASE_URL}/party/${id}`);
+        const response = await fetch(`${API_BASE_URL}/party/${id}`)
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch party: ${response.status}`);
+          throw new Error(`Failed to fetch party: ${response.status}`)
         }
 
-        const data = await response.json();
+        const data = await response.json()
 
-        setParty(data);
-        await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
+        setParty(data)
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(data))
       } catch (err: any) {
-        console.error('Error:', err);
-        setError(`Failed to load party details: ${err.message}`);
+        console.error('Error:', err)
+        setError(`Failed to load party details: ${err.message}`)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchParty();
-  }, [id, isLoaded, isSignedIn, router]);
+    fetchParty()
+  }, [id, isLoaded, isSignedIn, router])
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !userId || !id || !party) {
       if (isLoaded && !isSignedIn) {
-        router.replace('/');
+        router.replace('/')
       }
-      return;
+      return
     }
 
     const checkAttendanceAndReroute = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/user/${userId}/parties-attending`);
+        const response = await fetch(`${API_BASE_URL}/user/${userId}/parties-attending`)
 
-        if (!response.ok) return;
-        const attendingPartyIds: { party_id: string }[] = await response.json();
+        if (!response.ok) return
+        const attendingPartyIds: { party_id: string }[] = await response.json()
         if (attendingPartyIds.map((row) => row.party_id).includes(id as string)) {
-          router.replace(`/party/${id}/landing`);
+          router.replace(`/party/${id}/landing`)
         }
       } catch (err: any) {
-        console.error('Error checking user attendance:', err);
+        console.error('Error checking user attendance:', err)
       }
-    };
+    }
 
-    checkAttendanceAndReroute();
-  }, [isLoaded, isSignedIn, userId, id, party, router]);
+    checkAttendanceAndReroute()
+  }, [isLoaded, isSignedIn, userId, id, party, router])
 
   const handleAttend = async () => {
     if (!party || !userId) {
-      Alert.alert('Error', 'Party details not loaded or user not identified.');
-      return;
+      Alert.alert('Error', 'Party details not loaded or user not identified.')
+      return
     }
 
     try {
       const response = await fetch(
         `${API_BASE_URL}/party/${party.party_id}/attend?userId=${userId}`,
-      );
+      )
 
-      const data = await response.json();
+      const data = await response.json()
 
       if (response.ok && data.success) {
-        Alert.alert('Success', data.message || "Successfully RSVP'd!");
-        router.replace(`/party/${id}/landing`);
+        Alert.alert('Success', data.message || "Successfully RSVP'd!")
+        router.replace(`/party/${id}/landing`)
       } else {
-        Alert.alert('RSVP Failed', data.message || 'Could not RSVP for the party.');
+        Alert.alert('RSVP Failed', data.message || 'Could not RSVP for the party.')
       }
     } catch (err: any) {
-      console.error('Error updating attendance:', err);
-      Alert.alert('Error', `Failed to RSVP: ${err.message}`);
+      console.error('Error updating attendance:', err)
+      Alert.alert('Error', `Failed to RSVP: ${err.message}`)
     }
-  };
+  }
 
   if (!isLoaded || (isLoaded && !isSignedIn)) {
     return (
@@ -174,7 +174,7 @@ const PartyDetailsScreen: React.FC = () => {
         </Animated.View>
         <Text style={styles.loaderText}>Loading PartyLink...</Text>
       </LinearGradient>
-    );
+    )
   }
 
   if (loading && !party) {
@@ -188,7 +188,7 @@ const PartyDetailsScreen: React.FC = () => {
         </Animated.View>
         <Text style={styles.loaderText}>Getting the Party Ready...</Text>
       </LinearGradient>
-    );
+    )
   }
 
   if (error) {
@@ -205,7 +205,7 @@ const PartyDetailsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </LinearGradient>
-    );
+    )
   }
 
   if (!party) {
@@ -224,7 +224,7 @@ const PartyDetailsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </LinearGradient>
-    );
+    )
   }
 
   return (
@@ -279,7 +279,9 @@ const PartyDetailsScreen: React.FC = () => {
                   styles.ticketBadge,
                   {
                     backgroundColor:
-                      party.tickets_left > 0 ? `${Colors.dark.green400}30` : `${Colors.dark.red400}30`,
+                      party.tickets_left > 0
+                        ? `${Colors.dark.green400}30`
+                        : `${Colors.dark.red400}30`,
                   },
                 ]}
               >
@@ -300,7 +302,8 @@ const PartyDetailsScreen: React.FC = () => {
               style={[
                 styles.attendButton,
                 {
-                  backgroundColor: party.tickets_left > 0 ? Colors.dark.pink500 : Colors.dark.gray700, // Using gray700 for disabled
+                  backgroundColor:
+                    party.tickets_left > 0 ? Colors.dark.pink500 : Colors.dark.gray700, // Using gray700 for disabled
                 },
               ]}
               onPress={handleAttend}
@@ -348,7 +351,9 @@ const PartyDetailsScreen: React.FC = () => {
                   styles.ticketBadge,
                   {
                     backgroundColor:
-                      party.tickets_left > 0 ? `${Colors.dark.green400}30` : `${Colors.dark.red400}30`,
+                      party.tickets_left > 0
+                        ? `${Colors.dark.green400}30`
+                        : `${Colors.dark.red400}30`,
                   },
                 ]}
               >
@@ -369,7 +374,8 @@ const PartyDetailsScreen: React.FC = () => {
               style={[
                 styles.attendButton,
                 {
-                  backgroundColor: party.tickets_left > 0 ? Colors.dark.pink500 : Colors.dark.gray700,
+                  backgroundColor:
+                    party.tickets_left > 0 ? Colors.dark.pink500 : Colors.dark.gray700,
                 },
               ]}
               onPress={handleAttend}
@@ -403,8 +409,8 @@ const PartyDetailsScreen: React.FC = () => {
         <View style={{ height: 30 }} />
       </ScrollView>
     </LinearGradient>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -647,6 +653,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 14,
   },
-});
+})
 
-export default PartyDetailsScreen;
+export default PartyDetailsScreen

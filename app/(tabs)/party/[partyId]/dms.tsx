@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -9,49 +9,73 @@ import {
   Alert,
   Platform,
   RefreshControl,
-  Image
-} from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/clerk-expo';
+  Image,
+} from 'react-native'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { useAuth } from '@clerk/clerk-expo'
 import {
   MessageSquare,
   CheckCircle,
   XCircle,
   Clock,
   ChevronLeft,
-  MessageCircle
-} from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+  MessageCircle,
+  Users,
+} from 'lucide-react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import Colors, { API_BASE_URL } from '@/constants'
+import { ChatSessionRow, GroupRow, UserRow } from '@/types/database'
 
-import Colors, { API_BASE_URL } from '@/constants';
-import { ChatSessionRow, UserRow } from '@/types/database';
+const AppColors = Colors.dark
 
-const AppColors = Colors.dark;
-
+// Add GroupChatRow interface (based on your API)
+interface GroupChatRow {
+  group_chat_id: string
+  party_id: string
+  group1_id: string
+  group2_id: string
+  status: 'pending' | 'accepted' | 'declined'
+  created_at: string
+  updated_at: string
+}
 
 
 interface OpponentUserMap {
-  [userId: string]: UserRow;
+  [userId: string]: UserRow
 }
 
+interface OpponentGroupMap {
+  [groupId: string]: GroupRow
+}
 
 interface EnrichedChatSession extends ChatSessionRow {
-  opponentUser: UserRow | null;
+  opponentUser: UserRow | null
 }
 
+interface EnrichedGroupChatSession extends GroupChatRow {
+  opponentGroup: GroupRow | null
+}
 
 type FlatListDataItem =
   | { type: 'header'; title: string }
-  | { type: 'session'; data: EnrichedChatSession };
-
+  | { type: 'session'; data: EnrichedChatSession }
+  | { type: 'groupSession'; data: EnrichedGroupChatSession }
 
 interface ChatSessionCardProps {
-  session: EnrichedChatSession;
-  myUserId: string;
-  onAccept: (sessionId: string) => Promise<void>;
-  onDecline: (sessionId: string) => Promise<void>;
-  onOpenChat: (sessionId: string) => void;
+  session: EnrichedChatSession
+  myUserId: string
+  onAccept: (sessionId: string) => Promise<void>
+  onDecline: (sessionId: string) => Promise<void>
+  onOpenChat: (sessionId: string) => void
+}
+
+interface GroupChatSessionCardProps {
+  session: EnrichedGroupChatSession
+  myGroupId: string
+  onAccept: (sessionId: string) => Promise<void>
+  onDecline: (sessionId: string) => Promise<void>
+  onOpenChat: (sessionId: string) => void
 }
 
 const ChatSessionCard: React.FC<ChatSessionCardProps> = ({
@@ -61,12 +85,11 @@ const ChatSessionCard: React.FC<ChatSessionCardProps> = ({
   onDecline,
   onOpenChat,
 }) => {
-  const isRequester = session.user1_id === myUserId;
-  const isPendingReceived = session.status === 'pending' && !isRequester;
-
+  const isRequester = session.user1_id === myUserId
+  const isPendingReceived = session.status === 'pending' && !isRequester
   const opponentProfilePicUri = session.opponentUser?.user_id
     ? `${API_BASE_URL}/user/${session.opponentUser.user_id}/profile-picture`
-    : 'https://via.placeholder.com/100/A020F0/FFFFFF?text=U';
+    : 'https://via.placeholder.com/100/A020F0/FFFFFF?text=U'
 
   return (
     <View style={styles.chatCardContainer}>
@@ -86,8 +109,14 @@ const ChatSessionCard: React.FC<ChatSessionCardProps> = ({
         {session.status === 'declined' && (
           <View style={styles.chatCardStatusRow}>
             <XCircle size={16} color={AppColors.red400} />
-            <Text style={[styles.chatCardStatusText, { color: AppColors.red400 }]}>
-              Declined
+            <Text style={[styles.chatCardStatusText, { color: AppColors.red400 }]}>Declined</Text>
+          </View>
+        )}
+        {session.status === 'pending' && (
+          <View style={styles.chatCardStatusRow}>
+            <Clock size={16} color={AppColors.yellow400} />
+            <Text style={[styles.chatCardStatusText, { color: AppColors.yellow400 }]}>
+              {isRequester ? 'Sent Request' : 'Pending'}
             </Text>
           </View>
         )}
@@ -122,168 +151,355 @@ const ChatSessionCard: React.FC<ChatSessionCardProps> = ({
         )}
       </View>
     </View>
-  );
-};
+  )
+}
 
+const GroupChatSessionCard: React.FC<GroupChatSessionCardProps> = ({
+  session,
+  myGroupId,
+  onAccept,
+  onDecline,
+  onOpenChat,
+}) => {
+  const isRequester = session.group1_id === myGroupId
+  const isPendingReceived = session.status === 'pending' && !isRequester
+
+  return (
+    <View style={styles.chatCardContainer}>
+      <View style={styles.chatCardContent}>
+        <Text style={styles.chatCardUsername} numberOfLines={1}>
+          {`${session.opponentGroup?.creator_username}'s Group`}
+        </Text>
+        {session.status === 'accepted' && (
+          <View style={styles.chatCardStatusRow}>
+            <CheckCircle size={16} color={AppColors.green400} />
+            <Text style={[styles.chatCardStatusText, { color: AppColors.green400 }]}>
+              Group Chat Active
+            </Text>
+          </View>
+        )}
+        {session.status === 'declined' && (
+          <View style={styles.chatCardStatusRow}>
+            <XCircle size={16} color={AppColors.red400} />
+            <Text style={[styles.chatCardStatusText, { color: AppColors.red400 }]}>Declined</Text>
+          </View>
+        )}
+        {session.status === 'pending' && (
+          <View style={styles.chatCardStatusRow}>
+            <Clock size={16} color={AppColors.yellow400} />
+            <Text style={[styles.chatCardStatusText, { color: AppColors.yellow400 }]}>
+              {isRequester ? 'Sent Request' : 'Pending'}
+            </Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.chatCardActions}>
+        {session.status === 'accepted' && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.chatButton]}
+            onPress={() => onOpenChat(session.group_chat_id)}
+          >
+            <Users size={20} color={AppColors.white} />
+            <Text style={styles.actionButtonText}>Group Chat</Text>
+          </TouchableOpacity>
+        )}
+        {isPendingReceived && (
+          <>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.acceptButton]}
+              onPress={() => onAccept(session.group_chat_id)}
+            >
+              <CheckCircle size={20} color={AppColors.white} />
+              <Text style={styles.actionButtonText}>Accept</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.declineButton]}
+              onPress={() => onDecline(session.group_chat_id)}
+            >
+              <XCircle size={20} color={AppColors.white} />
+              <Text style={styles.actionButtonText}>Decline</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </View>
+  )
+}
 
 const DMScreen: React.FC = () => {
-  const router = useRouter();
-  const { userId: myUserId, isLoaded, isSignedIn } = useAuth();
+  const router = useRouter()
+  const { userId: myUserId, isLoaded, isSignedIn } = useAuth()
+  const [allChatSessions, setAllChatSessions] = useState<EnrichedChatSession[]>([])
+  const [allGroupChatSessions, setAllGroupChatSessions] = useState<EnrichedGroupChatSession[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [myGroup, setMyGroup] = useState<GroupRow | null>(null)
+  const { partyId } = useLocalSearchParams<{ partyId: string; }>()
 
-  const [allChatSessions, setAllChatSessions] = useState<EnrichedChatSession[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const { partyId } = useLocalSearchParams<{ partyId: string }>()
 
+  const fetchMyGroup = useCallback(async () => {
+    const myGroupRequest = await fetch(`${API_BASE_URL}/user/${myUserId}/party/${partyId}/group`)
+    const myGroupData: GroupRow = await myGroupRequest.json()
+    setMyGroup(myGroupData)
+  }, [myUserId])
 
   const fetchChatSessions = useCallback(async () => {
-    if (!myUserId) return;
-
-    !refreshing && setIsLoading(true);
+    if (!myUserId) return
+    !refreshing && setIsLoading(true)
     try {
-      const response = await fetch(`${API_BASE_URL}/chat/sessions/${myUserId}`);
+      const response = await fetch(`${API_BASE_URL}/chat/sessions/${myUserId}`)
       if (!response.ok) {
-        throw new Error(`Failed to fetch chat sessions: ${response.status}`);
+        throw new Error(`Failed to fetch chat sessions: ${response.status}`)
       }
-      let data: { sessions: ChatSessionRow[] } = await response.json();
-      data.sessions = data.sessions.filter(v => v.party_id === partyId)
-      
-      const uniqueOpponentIds = new Set<string>();
-      data.sessions.forEach(session => {
-        const opponentId = session.user1_id === myUserId ? session.user2_id : session.user1_id;
-        uniqueOpponentIds.add(opponentId);
-      });
+      let data: { sessions: ChatSessionRow[] } = await response.json()
+      data.sessions = data.sessions.filter((v) => v.party_id === partyId)
 
-      const fetchedOpponentUsers: OpponentUserMap = {};
+      const uniqueOpponentIds = new Set<string>()
+      data.sessions.forEach((session) => {
+        const opponentId = session.user1_id === myUserId ? session.user2_id : session.user1_id
+        uniqueOpponentIds.add(opponentId)
+      })
+
+      const fetchedOpponentUsers: OpponentUserMap = {}
       await Promise.all(
         Array.from(uniqueOpponentIds).map(async (id) => {
-          if (!id) return;
+          if (!id) return
           try {
-            const userResponse = await fetch(`${API_BASE_URL}/user/${id}`);
+            const userResponse = await fetch(`${API_BASE_URL}/user/${id}`)
             if (userResponse.ok) {
-              const userData: UserRow = await userResponse.json();
-              fetchedOpponentUsers[id] = userData;
+              const userData: UserRow = await userResponse.json()
+              fetchedOpponentUsers[id] = userData
             } else {
-              console.warn(`Failed to fetch user data for ${id}: ${userResponse.status}`);
+              console.warn(`Failed to fetch user data for ${id}: ${userResponse.status}`)
             }
           } catch (userErr) {
-            console.error(`Error fetching user ${id}:`, userErr);
+            console.error(`Error fetching user ${id}:`, userErr)
           }
-        })
-      );
+        }),
+      )
 
-      const enrichedSessions = data.sessions.map(session => {
-        const opponentId = session.user1_id === myUserId ? session.user2_id : session.user1_id;
+      const enrichedSessions = data.sessions.map((session) => {
+        const opponentId = session.user1_id === myUserId ? session.user2_id : session.user1_id
         return {
           ...session,
           opponentUser: fetchedOpponentUsers[opponentId] || null,
-        };
-      });
+        }
+      })
 
-      setAllChatSessions(enrichedSessions);
-      await AsyncStorage.setItem(`chat_sessions_${myUserId}`, JSON.stringify(enrichedSessions));
+      setAllChatSessions(enrichedSessions)
+      await AsyncStorage.setItem(`chat_sessions_${myUserId}`, JSON.stringify(enrichedSessions))
     } catch (e: any) {
-      console.error('Error fetching chat sessions:', e);
+      console.error('Error fetching chat sessions:', e)
       try {
-        const cached = await AsyncStorage.getItem(`chat_sessions_${myUserId}`);
+        const cached = await AsyncStorage.getItem(`chat_sessions_${myUserId}`)
         if (cached) {
-          setAllChatSessions(JSON.parse(cached));
-          Alert.alert('Offline Mode', 'Could not fetch latest data. Showing cached sessions.');
+          setAllChatSessions(JSON.parse(cached))
         }
       } catch (cacheErr) {
-        console.error('Failed to load cached sessions:', cacheErr);
+        console.error('Failed to load cached sessions:', cacheErr)
       }
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
     }
-  }, [myUserId, refreshing]);
+  }, [myUserId, refreshing, partyId])
 
+  const fetchGroupChatSessions = useCallback(async () => {
+    if (!myGroup) return
+    console.log(myGroup)
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/group-chat/sessions/${myGroup.group_id}`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch group chat sessions: ${response.status}`)
+      }
+      let data: { sessions: GroupChatRow[] } = await response.json()
+      console.log(data)
+      data.sessions = data.sessions.filter((v) => v.party_id === partyId)
+
+      const uniqueOpponentGroupIds = new Set<string>()
+      data.sessions.forEach((session) => {
+        const opponentGroupId = session.group1_id === myGroup.group_id ? session.group2_id : session.group1_id
+        uniqueOpponentGroupIds.add(opponentGroupId)
+      })
+
+      const fetchedOpponentGroups: OpponentGroupMap = {}
+      await Promise.all(
+        Array.from(uniqueOpponentGroupIds).map(async (id) => {
+          if (!id) return
+          try {
+            const groupResponse = await fetch(`${API_BASE_URL}/group/${id}`) // Assuming this endpoint exists
+            if (groupResponse.ok) {
+              const groupData: GroupRow = await groupResponse.json()
+              fetchedOpponentGroups[id] = groupData
+            } else {
+              console.warn(`Failed to fetch group data for ${id}: ${groupResponse.status}`)
+            }
+          } catch (groupErr) {
+            console.error(`Error fetching group ${id}:`, groupErr)
+          }
+        }),
+      )
+
+      const enrichedGroupSessions = data.sessions.map((session) => {
+        const opponentGroupId = session.group1_id === myGroup.group_id ? session.group2_id : session.group1_id
+        return {
+          ...session,
+          opponentGroup: fetchedOpponentGroups[opponentGroupId] || null,
+        }
+      })
+
+      setAllGroupChatSessions(enrichedGroupSessions)
+    } catch (e: any) {
+      console.error('Error fetching group chat sessions:', e)
+    }
+  }, [myGroup, partyId])
+
+  const fetchAllSessions = useCallback(async () => {
+    !refreshing && setIsLoading(true)
+    try {
+      await Promise.all([fetchChatSessions(), fetchGroupChatSessions()])
+
+      if (refreshing) {
+        Alert.alert('Success', 'Sessions refreshed successfully!')
+      }
+    } catch (e: any) {
+      console.error('Error fetching sessions:', e)
+      Alert.alert('Offline Mode', 'Could not fetch latest data. Showing cached sessions.')
+    } finally {
+      setIsLoading(false)
+      setRefreshing(false)
+    }
+  }, [fetchChatSessions, fetchGroupChatSessions, refreshing])
 
   useEffect(() => {
     if (isLoaded && isSignedIn && myUserId) {
-      fetchChatSessions();
+      fetchAllSessions()
     }
-  }, [isLoaded, isSignedIn, myUserId, fetchChatSessions]);
+  }, [isLoaded, isSignedIn, myUserId, fetchAllSessions])
 
+  useEffect(() => {
+    if (isLoaded && isSignedIn && myUserId) {
+      fetchMyGroup()
+    }
+  }, [fetchMyGroup])
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchChatSessions();
-  }, [fetchChatSessions]);
+    setRefreshing(true)
+    fetchAllSessions()
+  }, [fetchAllSessions])
 
   const handleAcceptChat = async (sessionId: string) => {
-    Alert.alert(
-      'Accept Chat Request',
-      'Are you sure you want to accept this chat request?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Accept',
-          onPress: async () => {
-            try {
-              const response = await fetch(`${API_BASE_URL}/chat/accept/${sessionId}`, {
-                method: 'POST',
-              });
-              if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Failed to accept chat: ${response.status}`);
-              }
-              Alert.alert('Success', 'Chat request accepted!');
-              fetchChatSessions();
-            } catch (e: any) {
-              Alert.alert('Error', e.message || 'Could not accept chat request.');
+    Alert.alert('Accept Chat Request', 'Are you sure you want to accept this chat request?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Accept',
+        onPress: async () => {
+          try {
+            const response = await fetch(`${API_BASE_URL}/chat/accept/${sessionId}`, {
+              method: 'POST',
+            })
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              throw new Error(errorData.message || `Failed to accept chat: ${response.status}`)
             }
-          },
+            Alert.alert('Success', 'Chat request accepted!')
+            fetchChatSessions()
+          } catch (e: any) {
+            Alert.alert('Error', e.message || 'Could not accept chat request.')
+          }
         },
-      ]
-    );
-  };
+      },
+    ])
+  }
 
   const handleDeclineChat = async (sessionId: string) => {
-    Alert.alert(
-      'Decline Chat Request',
-      'Are you sure you want to decline this chat request?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Decline',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await fetch(`${API_BASE_URL}/chat/decline/${sessionId}`, {
-                method: 'POST',
-              });
-              if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Failed to decline chat: ${response.status}`);
-              }
-              Alert.alert('Success', 'Chat request declined!');
-              fetchChatSessions();
-            } catch (e: any) {
-              Alert.alert('Error', e.message || 'Could not decline chat request.');
+    Alert.alert('Decline Chat Request', 'Are you sure you want to decline this chat request?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const response = await fetch(`${API_BASE_URL}/chat/decline/${sessionId}`, {
+              method: 'POST',
+            })
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              throw new Error(errorData.message || `Failed to decline chat: ${response.status}`)
             }
-          },
+            Alert.alert('Success', 'Chat request declined!')
+            fetchChatSessions()
+          } catch (e: any) {
+            Alert.alert('Error', e.message || 'Could not decline chat request.')
+          }
         },
-      ]
-    );
-  };
+      },
+    ])
+  }
+
+  const handleAcceptGroupChat = async (sessionId: string) => {
+    Alert.alert('Accept Group Chat Request', 'Are you sure you want to accept this group chat request?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Accept',
+        onPress: async () => {
+          try {
+            const response = await fetch(`${API_BASE_URL}/group-chat/accept/${sessionId}`, {
+              method: 'POST',
+            })
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              throw new Error(errorData.message || `Failed to accept group chat: ${response.status}`)
+            }
+            Alert.alert('Success', 'Group chat request accepted!')
+            fetchGroupChatSessions()
+          } catch (e: any) {
+            Alert.alert('Error', e.message || 'Could not accept group chat request.')
+          }
+        },
+      },
+    ])
+  }
+
+  const handleDeclineGroupChat = async (sessionId: string) => {
+    Alert.alert('Decline Group Chat Request', 'Are you sure you want to decline this group chat request?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const response = await fetch(`${API_BASE_URL}/group-chat/decline/${sessionId}`, {
+              method: 'POST',
+            })
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              throw new Error(errorData.message || `Failed to decline group chat: ${response.status}`)
+            }
+            Alert.alert('Success', 'Group chat request declined!')
+            fetchGroupChatSessions()
+          } catch (e: any) {
+            Alert.alert('Error', e.message || 'Could not decline group chat request.')
+          }
+        },
+      },
+    ])
+  }
 
   const handleOpenChat = (sessionId: string) => {
+    router.push(`/chat/${sessionId}`)
+  }
 
-    router.push(`/chat/${sessionId}`);
-  };
+  const handleOpenGroupChat = (sessionId: string) => {
+    router.push(`/group-chat/${sessionId}`)
+  }
 
-  const renderSectionHeader = (title: string) => (
-    <Text style={styles.sectionHeader}>{title}</Text>
-  );
+  const renderSectionHeader = (title: string) => <Text style={styles.sectionHeader}>{title}</Text>
 
   const renderEmptyList = (message: string) => (
     <View style={styles.noSessionsContainer}>
       <MessageSquare size={40} color={AppColors.gray400} style={styles.noSessionsIcon} />
       <Text style={styles.noSessionsText}>{message}</Text>
     </View>
-  );
+  )
 
   if (!isLoaded || !isSignedIn || !myUserId) {
     return (
@@ -292,44 +508,68 @@ const DMScreen: React.FC = () => {
         style={styles.centeredStatusContainer}
       >
         <ActivityIndicator size="large" color={AppColors.pink500} />
-        <Text style={styles.statusText}>Loading DMs...</Text>
+        <Text style={styles.statusText}>Loading Messages...</Text>
       </LinearGradient>
-    );
+    )
   }
 
-
-  const acceptedSessions = allChatSessions.filter(s => s.status === 'accepted');
+  // Individual chat sessions
+  const acceptedSessions = allChatSessions.filter((s) => s.status === 'accepted')
   const pendingSentSessions = allChatSessions.filter(
-    s => s.status === 'pending' && s.user1_id === myUserId
-  );
+    (s) => s.status === 'pending' && s.user1_id === myUserId,
+  )
   const pendingReceivedSessions = allChatSessions.filter(
-    s => s.status === 'pending' && s.user2_id === myUserId
-  );
-  const declinedSessions = allChatSessions.filter(s => s.status === 'declined');
+    (s) => s.status === 'pending' && s.user2_id === myUserId,
+  )
+  const declinedSessions = allChatSessions.filter((s) => s.status === 'declined')
 
+  // Group chat sessions
+  const acceptedGroupSessions = allGroupChatSessions.filter((s) => s.status === 'accepted')
+  const pendingSentGroupSessions = allGroupChatSessions.filter(
+    (s) => s.status === 'pending' && s.group1_id === myGroup?.group_id,
+  )
+  const pendingReceivedGroupSessions = allGroupChatSessions.filter(
+    (s) => s.status === 'pending' && s.group2_id === myGroup?.group_id,
+  )
+  const declinedGroupSessions = allGroupChatSessions.filter((s) => s.status === 'declined')
 
+  const flatListData: FlatListDataItem[] = []
 
-  const flatListData: FlatListDataItem[] = [];
-
-  if (pendingReceivedSessions.length > 0) {
-    flatListData.push({ type: 'header', title: 'Incoming Chat Requests' });
-    flatListData.push(...pendingReceivedSessions.map(s => ({ type: 'session' as 'session', data: s })));
+  // Incoming requests section
+  if (pendingReceivedSessions.length > 0 || pendingReceivedGroupSessions.length > 0) {
+    flatListData.push({ type: 'header', title: 'Incoming Requests' })
+    flatListData.push(
+      ...pendingReceivedSessions.map((s) => ({ type: 'session' as 'session', data: s })),
+    )
+    flatListData.push(
+      ...pendingReceivedGroupSessions.map((s) => ({ type: 'groupSession' as 'groupSession', data: s })),
+    )
   }
 
-
-  if (acceptedSessions.length > 0 || pendingSentSessions.length > 0) {
-    flatListData.push({ type: 'header', title: 'Chats' });
-
-    flatListData.push(...pendingSentSessions.map(s => ({ type: 'session' as 'session', data: s })));
-
-    flatListData.push(...acceptedSessions.map(s => ({ type: 'session' as 'session', data: s })));
+  // Active chats section
+  if (
+    acceptedSessions.length > 0 ||
+    pendingSentSessions.length > 0 ||
+    acceptedGroupSessions.length > 0 ||
+    pendingSentGroupSessions.length > 0
+  ) {
+    flatListData.push({ type: 'header', title: 'Active Chats' })
+    flatListData.push(
+      ...pendingSentSessions.map((s) => ({ type: 'session' as 'session', data: s })),
+    )
+    flatListData.push(...acceptedSessions.map((s) => ({ type: 'session' as 'session', data: s })))
+    flatListData.push(
+      ...pendingSentGroupSessions.map((s) => ({ type: 'groupSession' as 'groupSession', data: s })),
+    )
+    flatListData.push(...acceptedGroupSessions.map((s) => ({ type: 'groupSession' as 'groupSession', data: s })))
   }
 
-  if (declinedSessions.length > 0) {
-    flatListData.push({ type: 'header', title: 'Declined Chats' });
-    flatListData.push(...declinedSessions.map(s => ({ type: 'session' as 'session', data: s })));
+  // Declined section
+  if (declinedSessions.length > 0 || declinedGroupSessions.length > 0) {
+    flatListData.push({ type: 'header', title: 'Declined' })
+    flatListData.push(...declinedSessions.map((s) => ({ type: 'session' as 'session', data: s })))
+    flatListData.push(...declinedGroupSessions.map((s) => ({ type: 'groupSession' as 'groupSession', data: s })))
   }
-
 
   if (isLoading && flatListData.length === 0) {
     return (
@@ -340,14 +580,11 @@ const DMScreen: React.FC = () => {
         <ActivityIndicator size="large" color={AppColors.pink500} />
         <Text style={styles.statusText}>Loading your messages...</Text>
       </LinearGradient>
-    );
+    )
   }
 
   return (
-    <LinearGradient
-      colors={[AppColors.primaryBg, AppColors.secondaryBg]}
-      style={styles.container}
-    >
+    <LinearGradient colors={[AppColors.primaryBg, AppColors.secondaryBg]} style={styles.container}>
       <Stack.Screen
         options={{
           headerStyle: { backgroundColor: AppColors.secondaryBg },
@@ -362,20 +599,21 @@ const DMScreen: React.FC = () => {
           headerShadowVisible: false,
         }}
       />
-
       <FlatList
         data={flatListData}
         keyExtractor={(item, index) => {
           if (item.type === 'header') {
-            return `header_${item.title}`;
+            return `header_${item.title}`
+          } else if (item.type === 'session') {
+            return `session_${item.data.chat_session_id}`
           } else {
-            return `session_${item.data.chat_session_id}`;
+            return `groupSession_${item.data.group_chat_id}`
           }
         }}
         renderItem={({ item }) => {
           if (item.type === 'header') {
-            return renderSectionHeader(item.title);
-          } else {
+            return renderSectionHeader(item.title)
+          } else if (item.type === 'session') {
             return (
               <ChatSessionCard
                 session={item.data}
@@ -384,7 +622,17 @@ const DMScreen: React.FC = () => {
                 onDecline={handleDeclineChat}
                 onOpenChat={handleOpenChat}
               />
-            );
+            )
+          } else {
+            return (
+              <GroupChatSessionCard
+                session={item.data}
+                myGroupId={myGroup?.group_id || ''}
+                onAccept={handleAcceptGroupChat}
+                onDecline={handleDeclineGroupChat}
+                onOpenChat={handleOpenGroupChat}
+              />
+            )
           }
         }}
         ListEmptyComponent={
@@ -402,8 +650,8 @@ const DMScreen: React.FC = () => {
         }
       />
     </LinearGradient>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -454,6 +702,17 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     marginRight: 15,
+    borderWidth: 1,
+    borderColor: AppColors.gray500,
+  },
+  groupChatAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 15,
+    backgroundColor: AppColors.pink500,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: AppColors.gray500,
   },
@@ -519,6 +778,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-});
+})
 
-export default DMScreen;
+export default DMScreen

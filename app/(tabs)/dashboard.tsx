@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -12,9 +12,9 @@ import {
   Platform,
   Alert,
   ScrollView,
-} from 'react-native';
-import { useRouter, Link, Stack } from 'expo-router';
-import { useAuth } from '@clerk/clerk-expo';
+} from 'react-native'
+import { useRouter, Link, Stack } from 'expo-router'
+import { useAuth } from '@clerk/clerk-expo'
 import {
   Search,
   MessageSquare,
@@ -24,29 +24,29 @@ import {
   Calendar as CalendarIcon,
   Ticket,
   PartyPopper,
-} from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+} from 'lucide-react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withRepeat,
   Easing,
-} from 'react-native-reanimated';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+} from 'react-native-reanimated'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import Colors, { API_BASE_URL } from '@/constants';
-import { PartyRow, UserRow } from '@/types/database';
+import Colors, { API_BASE_URL } from '@/constants'
+import { PartyRow, UserRow } from '@/types/database'
 
-const AppColors = Colors.dark;
+const AppColors = Colors.dark
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window')
 
 const SearchFilters: React.FC<{
-  filters: { date: string; search: string };
-  setFilters: React.Dispatch<React.SetStateAction<{ date: string; search: string }>>;
+  filters: { date: string; search: string }
+  setFilters: React.Dispatch<React.SetStateAction<{ date: string; search: string }>>
 }> = ({ filters, setFilters }) => {
-  const filterDateOptions = ['Any Date', 'Today', 'This Weekend', 'Next Week', 'This Month'];
+  const filterDateOptions = ['Any Date', 'Today', 'This Weekend', 'Next Week', 'This Month']
 
   return (
     <View style={styles.searchFiltersContainer}>
@@ -86,8 +86,8 @@ const SearchFilters: React.FC<{
         ))}
       </ScrollView>
     </View>
-  );
-};
+  )
+}
 
 const PartyCard: React.FC<{ party: PartyRow }> = ({ party }) => {
   return (
@@ -138,22 +138,22 @@ const PartyCard: React.FC<{ party: PartyRow }> = ({ party }) => {
         </TouchableOpacity>
       </Link>
     </View>
-  );
-};
+  )
+}
 
 const DashboardScreen: React.FC = () => {
-  const { isLoaded, isSignedIn, signOut, userId } = useAuth();
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'explore' | 'attending'>('attending');
-  const [filters, setFilters] = useState({ search: '', date: 'Any Date' });
-  const [exploreParties, setExploreParties] = useState<PartyRow[]>([]);
-  const [attendingParties, setAttendingParties] = useState<PartyRow[]>([]);
-  const [contentLoading, setContentLoading] = useState(true);
-  const [initialAppLoading, setInitialAppLoading] = useState(true);
-  const [hasAttendingParties, setHasAttendingParties] = useState(false);
+  const { isLoaded, isSignedIn, signOut, userId } = useAuth()
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'explore' | 'attending'>('attending')
+  const [filters, setFilters] = useState({ search: '', date: 'Any Date' })
+  const [exploreParties, setExploreParties] = useState<PartyRow[]>([])
+  const [attendingParties, setAttendingParties] = useState<PartyRow[]>([])
+  const [contentLoading, setContentLoading] = useState(true)
+  const [initialAppLoading, setInitialAppLoading] = useState(true)
+  const [hasAttendingParties, setHasAttendingParties] = useState(false)
 
-  const loaderScale = useSharedValue(1);
-  const loaderOpacity = useSharedValue(0.7);
+  const loaderScale = useSharedValue(1)
+  const loaderOpacity = useSharedValue(0.7)
 
   useEffect(() => {
     if (initialAppLoading) {
@@ -161,105 +161,106 @@ const DashboardScreen: React.FC = () => {
         withTiming(1.2, { duration: 750, easing: Easing.inOut(Easing.ease) }),
         -1,
         true,
-      );
+      )
       loaderOpacity.value = withRepeat(
         withTiming(1, { duration: 750, easing: Easing.inOut(Easing.ease) }),
         -1,
         true,
-      );
+      )
     } else {
-      loaderScale.value = withTiming(1);
-      loaderOpacity.value = withTiming(1);
+      loaderScale.value = withTiming(1)
+      loaderOpacity.value = withTiming(1)
     }
-  }, [initialAppLoading, loaderScale, loaderOpacity]);
+  }, [initialAppLoading, loaderScale, loaderOpacity])
 
   const animatedLoaderStyle = useAnimatedStyle(() => ({
     transform: [{ scale: loaderScale.value }],
     opacity: loaderOpacity.value,
-  }));
+  }))
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
-      router.replace('/');
+      router.replace('/')
     }
     if (isLoaded && isSignedIn) {
-      setInitialAppLoading(false);
+      setInitialAppLoading(false)
     }
-  }, [isLoaded, isSignedIn, router]);
+  }, [isLoaded, isSignedIn, router])
 
   const fetchAllPartyData = useCallback(async () => {
-    if (!userId) return; // Ensure userId is available
+    if (!userId) return // Ensure userId is available
 
-    setContentLoading(true);
-    let allPartiesData: PartyRow[] = [];
-    let attendingPartyIds: string[] = [];
+    setContentLoading(true)
+    let allPartiesData: PartyRow[] = []
+    let attendingPartyIds: string[] = []
 
     try {
       // 1. Fetch parties the user is attending
-      const attendingResp = await fetch(`${API_BASE_URL}/user/${userId}/parties-attending`);
+      const attendingResp = await fetch(`${API_BASE_URL}/user/${userId}/parties-attending`)
       if (!attendingResp.ok) {
-        console.error('Failed to fetch attending parties:', attendingResp.status);
-        attendingPartyIds = [];
+        console.error('Failed to fetch attending parties:', attendingResp.status)
+        attendingPartyIds = []
       } else {
-        const attendingData: { party_id: string }[] = await attendingResp.json();
-        attendingPartyIds = attendingData.map(p => p.party_id);
+        const attendingData: { party_id: string }[] = await attendingResp.json()
+        attendingPartyIds = attendingData.map((p) => p.party_id)
       }
-      setHasAttendingParties(attendingPartyIds.length > 0);
+      setHasAttendingParties(attendingPartyIds.length > 0)
 
       // 2. Fetch all explore parties
-      const exploreResp = await fetch(`${API_BASE_URL}/party`);
-      if (!exploreResp.ok) throw new Error(`Status ${exploreResp.status}`);
-      allPartiesData = await exploreResp.json();
+      const exploreResp = await fetch(`${API_BASE_URL}/party`)
+      if (!exploreResp.ok) throw new Error(`Status ${exploreResp.status}`)
+      allPartiesData = await exploreResp.json()
 
       // Filter out attending parties from the explore list
       const filteredExplore = allPartiesData.filter(
-        (party) => !attendingPartyIds.includes(party.party_id)
-      );
-      setExploreParties(filteredExplore);
+        (party) => !attendingPartyIds.includes(party.party_id),
+      )
+      setExploreParties(filteredExplore)
 
       // Populate attending parties details (if needed, otherwise just use the IDs)
-      const detailsOfAttendingParties = allPartiesData.filter(
-        (party) => attendingPartyIds.includes(party.party_id)
-      );
-      setAttendingParties(detailsOfAttendingParties);
+      const detailsOfAttendingParties = allPartiesData.filter((party) =>
+        attendingPartyIds.includes(party.party_id),
+      )
+      setAttendingParties(detailsOfAttendingParties)
 
       // Cache data (optional, but good for performance)
-      await AsyncStorage.setItem('explore_parties_cache', JSON.stringify(filteredExplore));
-      await AsyncStorage.setItem('attending_parties_cache', JSON.stringify(detailsOfAttendingParties));
-
+      await AsyncStorage.setItem('explore_parties_cache', JSON.stringify(filteredExplore))
+      await AsyncStorage.setItem(
+        'attending_parties_cache',
+        JSON.stringify(detailsOfAttendingParties),
+      )
     } catch (err: any) {
-      console.error('Error fetching party data:', err);
-      Alert.alert('Error', `Could not load parties: ${err.message}`);
-      setExploreParties([]);
-      setAttendingParties([]);
-      setHasAttendingParties(false);
+      console.error('Error fetching party data:', err)
+      Alert.alert('Error', `Could not load parties: ${err.message}`)
+      setExploreParties([])
+      setAttendingParties([])
+      setHasAttendingParties(false)
     } finally {
-      setContentLoading(false);
+      setContentLoading(false)
     }
-  }, [userId]);
-
+  }, [userId])
 
   useEffect(() => {
-    if (!isSignedIn || initialAppLoading || !userId) return; // Ensure userId is loaded
+    if (!isSignedIn || initialAppLoading || !userId) return // Ensure userId is loaded
 
     const checkUserProfileAndFetchParties = async () => {
       try {
-        const userReq = await fetch(`${API_BASE_URL}/user/${userId}`);
-        const userData: UserRow = await userReq.json();
+        const userReq = await fetch(`${API_BASE_URL}/user/${userId}`)
+        const userData: UserRow = await userReq.json()
         if (Object.keys(userData).length === 0) {
-          router.push('/create-profile');
+          router.push('/create-profile')
         } else {
-          await fetchAllPartyData(); // Fetch parties only after user profile is checked
+          await fetchAllPartyData() // Fetch parties only after user profile is checked
         }
       } catch (err) {
-        console.error("Error checking user profile:", err);
-        Alert.alert("Error", "Failed to load user profile. Please try again.");
-        setInitialAppLoading(false); // Stop loading if profile check fails
+        console.error('Error checking user profile:', err)
+        Alert.alert('Error', 'Failed to load user profile. Please try again.')
+        setInitialAppLoading(false) // Stop loading if profile check fails
       }
-    };
+    }
 
-    checkUserProfileAndFetchParties();
-  }, [isSignedIn, initialAppLoading, userId, fetchAllPartyData, router]);
+    checkUserProfileAndFetchParties()
+  }, [isSignedIn, initialAppLoading, userId, fetchAllPartyData, router])
 
   const handleSignOut = async () => {
     Alert.alert('Confirm Sign Out', 'Are you sure you want to sign out?', [
@@ -269,51 +270,53 @@ const DashboardScreen: React.FC = () => {
         style: 'destructive',
         onPress: async () => {
           try {
-            await signOut();
+            await signOut()
           } catch (e) {
-            console.error('Sign out error', e);
-            Alert.alert('Error', 'Failed to sign out.');
+            console.error('Sign out error', e)
+            Alert.alert('Error', 'Failed to sign out.')
           }
         },
       },
-    ]);
-  };
+    ])
+  }
 
   const getFilteredParties = useCallback(() => {
-    const partiesToFilter = activeTab === 'explore' ? exploreParties : attendingParties;
+    const partiesToFilter = activeTab === 'explore' ? exploreParties : attendingParties
     return partiesToFilter.filter((p) => {
-      const searchLower = filters.search.toLowerCase();
-      const nameMatch = p.name.toLowerCase().includes(searchLower);
+      const searchLower = filters.search.toLowerCase()
+      const nameMatch = p.name.toLowerCase().includes(searchLower)
 
       // Basic date filtering (can be expanded)
-      let dateMatch = true;
-      const today = new Date();
-      const partyDate = new Date(p.party_date); // Assuming party_date is in a format parseable by Date
+      let dateMatch = true
+      const today = new Date()
+      const partyDate = new Date(p.party_date) // Assuming party_date is in a format parseable by Date
 
       if (filters.date === 'Today') {
-        dateMatch = partyDate.toDateString() === today.toDateString();
+        dateMatch = partyDate.toDateString() === today.toDateString()
       } else if (filters.date === 'This Weekend') {
-        const saturday = new Date(today);
-        saturday.setDate(today.getDate() + (6 - today.getDay())); // Get next Saturday
-        const sunday = new Date(today);
-        sunday.setDate(today.getDate() + (7 - today.getDay())); // Get next Sunday
-        dateMatch = (partyDate >= saturday && partyDate <= sunday);
+        const saturday = new Date(today)
+        saturday.setDate(today.getDate() + (6 - today.getDay())) // Get next Saturday
+        const sunday = new Date(today)
+        sunday.setDate(today.getDate() + (7 - today.getDay())) // Get next Sunday
+        dateMatch = partyDate >= saturday && partyDate <= sunday
       } else if (filters.date === 'Next Week') {
-        const nextMonday = new Date(today);
-        nextMonday.setDate(today.getDate() + (8 - today.getDay()));
-        const nextSunday = new Date(nextMonday);
-        nextSunday.setDate(nextMonday.getDate() + 6);
-        dateMatch = (partyDate >= nextMonday && partyDate <= nextSunday);
+        const nextMonday = new Date(today)
+        nextMonday.setDate(today.getDate() + (8 - today.getDay()))
+        const nextSunday = new Date(nextMonday)
+        nextSunday.setDate(nextMonday.getDate() + 6)
+        dateMatch = partyDate >= nextMonday && partyDate <= nextSunday
       } else if (filters.date === 'This Month') {
-        dateMatch = partyDate.getMonth() === today.getMonth() && partyDate.getFullYear() === today.getFullYear();
+        dateMatch =
+          partyDate.getMonth() === today.getMonth() &&
+          partyDate.getFullYear() === today.getFullYear()
       }
       // 'Any Date' always matches
 
-      return nameMatch && dateMatch;
-    });
-  }, [filters, activeTab, exploreParties, attendingParties]);
+      return nameMatch && dateMatch
+    })
+  }, [filters, activeTab, exploreParties, attendingParties])
 
-  const displayedParties = getFilteredParties();
+  const displayedParties = getFilteredParties()
 
   const ListHeader = () => (
     <>
@@ -329,7 +332,7 @@ const DashboardScreen: React.FC = () => {
       </View>
       <SearchFilters filters={filters} setFilters={setFilters} />
     </>
-  );
+  )
 
   const EmptyListComponent = () => (
     <View style={styles.noPartiesContainer}>
@@ -339,7 +342,7 @@ const DashboardScreen: React.FC = () => {
       <Text style={styles.noPartiesTitle}>No parties found</Text>
       <Text style={styles.noPartiesSubtitle}>Try adjusting your search or check back later!</Text>
     </View>
-  );
+  )
 
   if (initialAppLoading || !isLoaded) {
     return (
@@ -352,7 +355,7 @@ const DashboardScreen: React.FC = () => {
         </Animated.View>
         <Text style={styles.loaderText}>Loading PartyLink...</Text>
       </LinearGradient>
-    );
+    )
   }
 
   return (
@@ -360,51 +363,51 @@ const DashboardScreen: React.FC = () => {
       colors={[AppColors.primaryBg, AppColors.secondaryBg, AppColors.darkerBg]}
       style={styles.dashboardContainer}
     >
-      <Stack.Screen
-        options={{
-          headerStyle: { backgroundColor: AppColors.secondaryBg },
-          headerTintColor: AppColors.white,
-          headerTitle: () => (
-            <View style={styles.headerTitleContainer}>
-              <PartyPopper size={26} color={AppColors.pink500} />
-              <Text style={styles.headerTitleText}>PartyLink</Text>
-            </View>
-          ),
-          headerLeft: () => (
-            userId ? (
-              <TouchableOpacity
-                onPress={() => router.push('/user/update')} // Navigate to user profile settings
-                style={styles.profilePictureHeaderContainer}
-              >
-                <Image
-                  source={{ uri: `${API_BASE_URL}/user/${userId}/profile-picture` }}
-                  style={styles.profilePictureHeader}
-                  onError={(e) => console.log('Profile Image Load Error:', e.nativeEvent.error)}
-                />
-              </TouchableOpacity>
-            ) : null
-          ),
-          headerRight: () => (
-            <View style={styles.headerIconsContainer}>
-              <TouchableOpacity
-                onPress={handleSignOut}
-                style={[styles.headerIconWrapper, { marginLeft: 10 }]}
-              >
-                <LogOut size={24} color={AppColors.gray300} />
-              </TouchableOpacity>
-            </View>
-          ),
-          headerShadowVisible: false,
-        }}
-      />
+ <Stack.Screen
+  options={{
+    headerStyle: { backgroundColor: AppColors.secondaryBg },
+    headerTintColor: AppColors.white,
+    headerTitleAlign: 'center', // Ensures the title tries to stay in the center
+    headerTitle: () => (
+      <View style={styles.headerTitleContainer}>
+        <PartyPopper size={26} color={AppColors.pink500} />
+        <Text style={styles.headerTitleText}>PartyLink</Text>
+      </View>
+    ),
+    headerLeft: () =>
+      userId ? (
+        <TouchableOpacity
+          onPress={() => router.push('/user/update')}
+          style={styles.profilePictureHeaderContainer} // Keep this for padding/border
+        >
+          <Image
+            source={{ uri: `${API_BASE_URL}/user/${userId}/profile-picture` }}
+            style={styles.profilePictureHeader}
+            onError={(e) => console.log('Profile Image Load Error:', e.nativeEvent.error)}
+          />
+        </TouchableOpacity>
+      ) : null,
+    headerRight: () => (
+      <View style={styles.headerIconsContainer}>
+        <TouchableOpacity
+          onPress={handleSignOut}
+          style={styles.headerIconWrapper} // Removed marginLeft here
+        >
+          <LogOut size={24} color={AppColors.gray300} />
+        </TouchableOpacity>
+      </View>
+    ),
+    headerShadowVisible: false,
+  }}
+/>
 
       <View style={styles.tabSelectorContainer}>
         {hasAttendingParties && (
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'attending' && styles.activeTabButton]}
             onPress={() => {
-              setActiveTab('attending');
-              setFilters({ search: '', date: 'Any Date' });
+              setActiveTab('attending')
+              setFilters({ search: '', date: 'Any Date' })
             }}
           >
             <Ticket
@@ -425,8 +428,8 @@ const DashboardScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'explore' && styles.activeTabButton]}
           onPress={() => {
-            setActiveTab('explore');
-            setFilters({ search: '', date: 'Any Date' });
+            setActiveTab('explore')
+            setFilters({ search: '', date: 'Any Date' })
           }}
         >
           <Compass
@@ -441,7 +444,6 @@ const DashboardScreen: React.FC = () => {
         </TouchableOpacity>
 
         {/* Attending Tab - Only visible if hasAttendingParties is true */}
-
       </View>
 
       {contentLoading && displayedParties.length === 0 ? (
@@ -477,8 +479,8 @@ const DashboardScreen: React.FC = () => {
         />
       )}
     </LinearGradient>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   dashboardContainer: { flex: 1 },
@@ -494,7 +496,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   headerIconsContainer: { flexDirection: 'row', alignItems: 'center' },
-  headerIconWrapper: { padding: 6, position: 'relative' },
+  headerIconWrapper: { padding: 6 },
   messageBadge: {
     position: 'absolute',
     top: 3,
@@ -509,7 +511,6 @@ const styles = StyleSheet.create({
   messageBadgeText: { color: AppColors.white, fontSize: 10, fontWeight: 'bold' },
   // New styles for profile picture in header
   profilePictureHeaderContainer: {
-    marginLeft: 60, // Increased from 15 to 60 (or adjust as needed)
     padding: 2,
   },
   profilePictureHeader: {
@@ -664,6 +665,6 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 10,
   },
-});
+})
 
-export default DashboardScreen;
+export default DashboardScreen

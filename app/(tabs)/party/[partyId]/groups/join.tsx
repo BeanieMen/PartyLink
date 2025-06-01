@@ -157,7 +157,9 @@ const JoinGroupScreen = () => {
     }
 
     try {
-      const reqRes = await fetch(`${API_BASE_URL}/user/${userId}/invitations/requests?partyId=${partyId}`)
+      const reqRes = await fetch(
+        `${API_BASE_URL}/user/${userId}/invitations/requests?partyId=${partyId}`,
+      )
       if (!reqRes.ok) {
         if (reqRes.status === 404) {
           setUserOutgoingRequestGroupId(null)
@@ -166,20 +168,22 @@ const JoinGroupScreen = () => {
         }
       } else {
         const requestData: {
-          group_member_id: string;
-          group_id: string;
-          party_name: string;
-          party_id: string;
+          group_member_id: string
+          group_id: string
+          party_name: string
+          party_id: string
           inviter: {
-            userId: string;
-            username: string;
-          };
-          created_at: string;
+            userId: string
+            username: string
+          }
+          created_at: string
         }[] = await reqRes.json()
         if (requestData.length > 0 && requestData[0].group_id) {
           setUserOutgoingRequestGroupId(requestData[0].group_id || null)
           setSearchedGroups((prev) =>
-            prev.map((g) => (g.group_id === requestData[0].group_id ? { ...g, requested_by_user: true } : g)),
+            prev.map((g) =>
+              g.group_id === requestData[0].group_id ? { ...g, requested_by_user: true } : g,
+            ),
           )
         } else {
           setUserOutgoingRequestGroupId(null)
@@ -220,7 +224,7 @@ const JoinGroupScreen = () => {
         )
       Alert.alert('Success', `Invitation ${response === 'accept' ? 'accepted' : 'decline'}d!`)
       if (response === 'accept') {
-        router.replace(`/party/${partyId}/groups`);
+        router.replace(`/party/${partyId}/groups`)
       }
       fetchData()
     } catch (err: any) {
@@ -291,7 +295,6 @@ const JoinGroupScreen = () => {
           <Text style={styles.invitedByText} numberOfLines={1}>
             For: <Text style={{ fontWeight: 'bold' }}>{item.party_name}</Text>
           </Text>
-
         </View>
         <View style={styles.invitationActions}>
           <TouchableOpacity

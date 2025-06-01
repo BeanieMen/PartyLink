@@ -44,14 +44,14 @@ export interface TicketRow {
 }
 
 export interface GroupRow {
-  group_id: string;
-  party_id: string;
-  creator_user_id: string;
-  creator_username: string;
-  max_members: number;
-  established: number; // 0 or 1
-  created_at: string;
-  updated_at: string;
+  group_id: string
+  party_id: string
+  creator_user_id: string
+  creator_username: string
+  max_members: number
+  established: number // 0 or 1
+  created_at: string
+  updated_at: string
 }
 
 export interface GroupMemberRow {
@@ -90,13 +90,11 @@ export interface CommentRow {
   updated_at: string
 }
 
-
-
 export interface ChatSessionRow {
   chat_session_id: string
   user1_id: string // requester
   user2_id: string // requestee
-  party_id: string;
+  party_id: string
   status: 'pending' | 'accepted' | 'declined'
   created_at: string
   updated_at: string
@@ -113,7 +111,7 @@ export interface MessageRow {
 export interface GroupChatRow {
   group_chat_id: string
   group1_id: string
-  party_id: string;
+  party_id: string
   group2_id: string
   created_at: string
   updated_at: string
@@ -128,14 +126,14 @@ export interface GroupMessageRow {
 }
 
 export interface GroupDislikeRow {
-  dislike_id: string;
-  user_id: string;
-  group_id: string;
-  created_at: string;
+  dislike_id: string
+  user_id: string
+  group_id: string
+  created_at: string
 }
 
 export interface FrontendQuestion extends QuestionRow {
-  votes: VoteRow[];
-  my_vote?: VoteRow | null;
-  vote_counts?: { [voted_for_user_id: string]: number };
+  votes: VoteRow[]
+  my_vote?: VoteRow | null
+  vote_counts?: { [voted_for_user_id: string]: number }
 }

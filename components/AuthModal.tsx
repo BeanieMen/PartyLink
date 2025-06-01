@@ -26,7 +26,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialView }) =
   const { startSSOFlow } = useSSO()
   const [provider, setProvider] = useState<'google' | 'discord' | null>(null)
 
-
   const handleSSO = useCallback(
     async (strategy: 'oauth_google' | 'oauth_discord') => {
       setProvider(strategy === 'oauth_google' ? 'google' : 'discord')

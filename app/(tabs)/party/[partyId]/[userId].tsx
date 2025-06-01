@@ -10,7 +10,7 @@ import {
   Alert,
   Linking,
   Platform,
-  Image
+  Image,
 } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import {
@@ -22,7 +22,7 @@ import {
   Link as LinkIcon,
   AlertCircle,
   ChevronLeft,
-  UserPlus // Import for the new friend icon
+  UserPlus, // Import for the new friend icon
 } from 'lucide-react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 
@@ -54,7 +54,7 @@ const parseUserDescription = (descriptionString: string | null): ParsedDescripti
   const parts = descriptionString.split(',')
   parts.forEach((part) => {
     const firstColonIndex = part.indexOf(':')
-    if (firstColonIndex === -1) return;
+    if (firstColonIndex === -1) return
 
     const key = part.substring(0, firstColonIndex)
     const value = part.substring(firstColonIndex + 1)
@@ -68,7 +68,7 @@ const parseUserDescription = (descriptionString: string | null): ParsedDescripti
 
 const UserProfileScreen: React.FC = () => {
   const router = useRouter()
-  const { partyId, userId } = useLocalSearchParams<{ partyId: string, userId: string }>();
+  const { partyId, userId } = useLocalSearchParams<{ partyId: string; userId: string }>()
   const { userId: myUserId } = useAuth() // This is the current logged-in user's ID
 
   const [user, setUser] = useState<UserRow | null>(null)
@@ -77,10 +77,14 @@ const UserProfileScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // State to hold the chat session status
-  const [chatStatus, setChatStatus] = useState<'none' | 'pending' | 'accepted' | 'declined' | null>(null);
+  const [chatStatus, setChatStatus] = useState<'none' | 'pending' | 'accepted' | 'declined' | null>(
+    null,
+  )
   const [chatSessionId, setChatSessionId] = useState<string>()
   // New state for friend request status
-  const [friendStatus, setFriendStatus] = useState<'none' | 'pending' | 'accepted' | 'declined' | null>(null);
+  const [friendStatus, setFriendStatus] = useState<
+    'none' | 'pending' | 'accepted' | 'declined' | null
+  >(null)
 
   // Effect to fetch user data
   useEffect(() => {
@@ -104,7 +108,14 @@ const UserProfileScreen: React.FC = () => {
         const userData: UserRow = await response.json()
         setUser(userData)
         setParsedDescription(parseUserDescription(userData.description))
-        setSocialLinks(userData.socials ? userData.socials.split(',').map(s => s.trim()).filter(s => s) : [])
+        setSocialLinks(
+          userData.socials
+            ? userData.socials
+                .split(',')
+                .map((s) => s.trim())
+                .filter((s) => s)
+            : [],
+        )
       } catch (e: any) {
         setError(e.message || 'An unexpected error occurred.')
         setUser(null)
@@ -120,34 +131,36 @@ const UserProfileScreen: React.FC = () => {
   useEffect(() => {
     if (!userId || !myUserId || userId === myUserId) {
       // Don't fetch status if userId is missing, myUserId is missing, or it's the current user's profile
-      setChatStatus('none'); // Assume 'none' if it's the current user's profile or missing IDs
-      return;
+      setChatStatus('none') // Assume 'none' if it's the current user's profile or missing IDs
+      return
     }
 
     const fetchChatStatus = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/chat/status?user1_id=${myUserId}&user2_id=${userId}&party_id=${partyId}`);
+        const response = await fetch(
+          `${API_BASE_URL}/chat/status?user1_id=${myUserId}&user2_id=${userId}&party_id=${partyId}`,
+        )
         if (!response.ok) {
           if (response.status === 404) {
-            setChatStatus('none'); // No session found
+            setChatStatus('none') // No session found
           } else {
             // Log other errors but don't block the UI
-            console.error(`Failed to fetch chat status: ${response.status}`);
-            setChatStatus('none'); // Default to none on error
+            console.error(`Failed to fetch chat status: ${response.status}`)
+            setChatStatus('none') // Default to none on error
           }
-          return;
+          return
         }
-        const data = await response.json();
-        setChatStatus(data.status);
+        const data = await response.json()
+        setChatStatus(data.status)
         setChatSessionId(data.chatSessionId)
       } catch (e) {
-        console.error('Error fetching chat status:', e);
-        setChatStatus('none'); // Default to none on network error
+        console.error('Error fetching chat status:', e)
+        setChatStatus('none') // Default to none on network error
       }
-    };
+    }
 
-    fetchChatStatus();
-  }, [userId, myUserId, partyId]); // Re-run when userId or myUserId changes
+    fetchChatStatus()
+  }, [userId, myUserId, partyId]) // Re-run when userId or myUserId changes
 
   const handleRequestToChat = async () => {
     if (!userId || !myUserId) {
@@ -157,46 +170,51 @@ const UserProfileScreen: React.FC = () => {
 
     // Prevent sending request if already pending or accepted
     if (chatStatus === 'pending') {
-      Alert.alert('Info', 'Chat request is already pending.');
-      return;
+      Alert.alert('Info', 'Chat request is already pending.')
+      return
     }
     if (chatStatus === 'accepted') {
-      Alert.alert('Info', 'You are already chatting with this user.');
+      Alert.alert('Info', 'You are already chatting with this user.')
       // Optionally navigate to chat screen here
-      router.push(`/chat/${chatSessionId}`);
-      return;
+      router.push(`/chat/${chatSessionId}`)
+      return
     }
 
     try {
       // Set status to 'pending' immediately on the client side
-      setChatStatus('pending');
+      setChatStatus('pending')
 
       const response = await fetch(`${API_BASE_URL}/chat/create-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ requester_user_id: myUserId, requestee_user_id: userId, party_id: partyId})
+        body: JSON.stringify({
+          requester_user_id: myUserId,
+          requestee_user_id: userId,
+          party_id: partyId,
+        }),
       })
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         // If API call fails, revert status or handle error gracefully
-        setChatStatus('none'); // Or 'declined' if the API provides that context
-        throw new Error(errorData.message || `Failed to send chat request. Status: ${response.status}`)
+        setChatStatus('none') // Or 'declined' if the API provides that context
+        throw new Error(
+          errorData.message || `Failed to send chat request. Status: ${response.status}`,
+        )
       }
-      const responseData = await response.json();
+      const responseData = await response.json()
       // The API response might confirm the status, but we already set it to 'pending'
       // If the API returns a different status (e.g., 'accepted' immediately), update it
       if (responseData.status) {
-        setChatStatus(responseData.status);
+        setChatStatus(responseData.status)
       }
-      Alert.alert('Success', 'Chat request sent successfully!');
+      Alert.alert('Success', 'Chat request sent successfully!')
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Could not send chat request.')
-      setChatStatus('none'); // Revert status if there was an error
+      setChatStatus('none') // Revert status if there was an error
     }
   }
-
 
   const openLink = (url: string) => {
     let fullUrl = url
@@ -270,38 +288,41 @@ const UserProfileScreen: React.FC = () => {
   }
 
   // Determine if the profile has a "role" or a generic "actor" type
-  const userRole = parsedDescription?.bio?.includes('Actor') ? 'Actor' : '';
-  const ageString = parsedDescription?.age ? `${parsedDescription.age} years old` : '';
-  const socialInstagram = socialLinks.find(link => link.includes('instagram.com') || link.includes('insta:'));
-  const displayInstagram = socialInstagram ? `insta: ${socialInstagram.replace(/(https?:\/\/)?(www\.)?instagram\.com\//, '').replace(/\//g, '')}` : '';
+  const userRole = parsedDescription?.bio?.includes('Actor') ? 'Actor' : ''
+  const ageString = parsedDescription?.age ? `${parsedDescription.age} years old` : ''
+  const socialInstagram = socialLinks.find(
+    (link) => link.includes('instagram.com') || link.includes('insta:'),
+  )
+  const displayInstagram = socialInstagram
+    ? `insta: ${socialInstagram.replace(/(https?:\/\/)?(www\.)?instagram\.com\//, '').replace(/\//g, '')}`
+    : ''
 
   // Determine button text and style based on chat status
-  let chatButtonText = 'Request to Chat';
-  let chatButtonStyles = styles.requestedButton; // Default style
-  let chatButtonTextStyle = styles.requestedButtonText;
-  let isChatButtonDisabled = false;
+  let chatButtonText = 'Request to Chat'
+  let chatButtonStyles = styles.requestedButton // Default style
+  let chatButtonTextStyle = styles.requestedButtonText
+  let isChatButtonDisabled = false
 
   if (userId === myUserId) {
     // If it's the current user's own profile, hide the button
-    chatButtonText = ''; // No text
-    isChatButtonDisabled = true; // Disable it
+    chatButtonText = '' // No text
+    isChatButtonDisabled = true // Disable it
   } else if (chatStatus === 'pending') {
-    chatButtonText = 'Requested';
-    chatButtonStyles = { ...styles.requestedButton, backgroundColor: AppColors.gray400 }; // Change color
-    chatButtonTextStyle = { ...styles.requestedButtonText, color: AppColors.white }; // Change text color
-    isChatButtonDisabled = true; // Disable button
+    chatButtonText = 'Requested'
+    chatButtonStyles = { ...styles.requestedButton, backgroundColor: AppColors.gray400 } // Change color
+    chatButtonTextStyle = { ...styles.requestedButtonText, color: AppColors.white } // Change text color
+    isChatButtonDisabled = true // Disable button
   } else if (chatStatus === 'accepted') {
-    chatButtonText = 'Chat Now';
-    chatButtonStyles = { ...styles.requestedButton, backgroundColor: AppColors.blue500 }; // Different color for accepted
-    chatButtonTextStyle = { ...styles.requestedButtonText, color: AppColors.white };
-    isChatButtonDisabled = false; // Allow clicking to chat
+    chatButtonText = 'Chat Now'
+    chatButtonStyles = { ...styles.requestedButton, backgroundColor: AppColors.blue500 } // Different color for accepted
+    chatButtonTextStyle = { ...styles.requestedButtonText, color: AppColors.white }
+    isChatButtonDisabled = false // Allow clicking to chat
   } else if (chatStatus === 'declined') {
-    chatButtonText = 'Request Again';
-    chatButtonStyles = { ...styles.requestedButton, backgroundColor: AppColors.pink500 }; // Allow requesting again
-    chatButtonTextStyle = { ...styles.requestedButtonText, color: AppColors.white };
-    isChatButtonDisabled = false;
+    chatButtonText = 'Request Again'
+    chatButtonStyles = { ...styles.requestedButton, backgroundColor: AppColors.pink500 } // Allow requesting again
+    chatButtonTextStyle = { ...styles.requestedButtonText, color: AppColors.white }
+    isChatButtonDisabled = false
   }
-
 
   return (
     <LinearGradient
@@ -319,7 +340,7 @@ const UserProfileScreen: React.FC = () => {
       <View style={styles.profileCard}>
         <View style={styles.cardHeader}>
           <Image
-            source={{ uri: `${API_BASE_URL}/user/${userId}/profile-picture`}}
+            source={{ uri: `${API_BASE_URL}/user/${userId}/profile-picture` }}
             style={styles.smallAvatar}
           />
           <View style={styles.buttonContainer}>
@@ -332,14 +353,15 @@ const UserProfileScreen: React.FC = () => {
                 <Text style={chatButtonTextStyle}>{chatButtonText}</Text>
               </TouchableOpacity>
             )}
-           
           </View>
         </View>
 
         <View style={styles.userInfoSection}>
           <Text style={styles.username}>{user.username}</Text>
           {/* Display school right below username */}
-          {parsedDescription?.school ? <Text style={styles.userDetailText}>{parsedDescription.school}</Text> : null}
+          {parsedDescription?.school ? (
+            <Text style={styles.userDetailText}>{parsedDescription.school}</Text>
+          ) : null}
           {userRole ? <Text style={styles.userRole}>{userRole}</Text> : null}
           {ageString ? <Text style={styles.userDetailText}>{ageString}</Text> : null}
           {displayInstagram ? (
@@ -351,7 +373,11 @@ const UserProfileScreen: React.FC = () => {
 
         <View style={styles.mainPortraitContainer}>
           <Image
-            source={{ uri: `${API_BASE_URL}/user/${userId}/portrait` || 'https://via.placeholder.com/300/A020F0/FFFFFF?text=Portrait' }}
+            source={{
+              uri:
+                `${API_BASE_URL}/user/${userId}/portrait` ||
+                'https://via.placeholder.com/300/A020F0/FFFFFF?text=Portrait',
+            }}
             style={styles.mainPortrait}
           />
         </View>
@@ -366,28 +392,36 @@ const UserProfileScreen: React.FC = () => {
           </View>
         )}
 
-        {(parsedDescription?.age || parsedDescription?.school) && (!ageString && !parsedDescription?.school) && (
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              {(parsedDescription?.age && !parsedDescription?.school) && <Cake size={20} color={AppColors.blue500} style={styles.sectionIcon} />}
-              {(!parsedDescription?.age && parsedDescription?.school) && <GraduationCap size={20} color={AppColors.blue500} style={styles.sectionIcon} />}
-              {(parsedDescription?.age && parsedDescription?.school) && <UserCircle size={20} color={AppColors.blue500} style={styles.sectionIcon} />}
-              <Text style={styles.sectionTitle}>Details</Text>
+        {(parsedDescription?.age || parsedDescription?.school) &&
+          !ageString &&
+          !parsedDescription?.school && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                {parsedDescription?.age && !parsedDescription?.school && (
+                  <Cake size={20} color={AppColors.blue500} style={styles.sectionIcon} />
+                )}
+                {!parsedDescription?.age && parsedDescription?.school && (
+                  <GraduationCap size={20} color={AppColors.blue500} style={styles.sectionIcon} />
+                )}
+                {parsedDescription?.age && parsedDescription?.school && (
+                  <UserCircle size={20} color={AppColors.blue500} style={styles.sectionIcon} />
+                )}
+                <Text style={styles.sectionTitle}>Details</Text>
+              </View>
+              {parsedDescription.age && (
+                <View style={styles.detailItem}>
+                  <Cake size={18} color={AppColors.gray300} style={styles.detailIcon} />
+                  <Text style={styles.sectionContentText}>Age: {parsedDescription.age}</Text>
+                </View>
+              )}
+              {parsedDescription.school && (
+                <View style={styles.detailItem}>
+                  <GraduationCap size={18} color={AppColors.gray300} style={styles.detailIcon} />
+                  <Text style={styles.sectionContentText}>School: {parsedDescription.school}</Text>
+                </View>
+              )}
             </View>
-            {parsedDescription.age && (
-              <View style={styles.detailItem}>
-                <Cake size={18} color={AppColors.gray300} style={styles.detailIcon} />
-                <Text style={styles.sectionContentText}>Age: {parsedDescription.age}</Text>
-              </View>
-            )}
-            {parsedDescription.school && (
-              <View style={styles.detailItem}>
-                <GraduationCap size={18} color={AppColors.gray300} style={styles.detailIcon} />
-                <Text style={styles.sectionContentText}>School: {parsedDescription.school}</Text>
-              </View>
-            )}
-          </View>
-        )}
+          )}
 
         {socialLinks.length > 0 && !displayInstagram && (
           <View style={styles.sectionContainer}>
@@ -396,18 +430,25 @@ const UserProfileScreen: React.FC = () => {
               <Text style={styles.sectionTitle}>Connect</Text>
             </View>
             {socialLinks.map((link, index) => (
-              <TouchableOpacity key={index} onPress={() => openLink(link)} style={styles.socialLinkItem}>
+              <TouchableOpacity
+                key={index}
+                onPress={() => openLink(link)}
+                style={styles.socialLinkItem}
+              >
                 <LinkIcon size={16} color={AppColors.pink500} style={styles.detailIcon} />
-                <Text style={styles.socialLinkText} numberOfLines={1}>{link}</Text>
+                <Text style={styles.socialLinkText} numberOfLines={1}>
+                  {link}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
 
         <View style={styles.footerInfo}>
-          <Text style={styles.footerText}>Joined: {new Date(user.created_at).toLocaleDateString()}</Text>
+          <Text style={styles.footerText}>
+            Joined: {new Date(user.created_at).toLocaleDateString()}
+          </Text>
         </View>
-
       </View>
     </LinearGradient>
   )
@@ -584,7 +625,7 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 13,
     color: AppColors.gray400,
-  }
+  },
 })
 
 export default UserProfileScreen

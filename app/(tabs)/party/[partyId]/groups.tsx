@@ -34,32 +34,31 @@ const { width } = Dimensions.get('window')
 
 const memberItemWidth = (width - 40 - 30) / 2
 
-
 interface FrontendQuestion extends QuestionRow {
   votes: VoteRow[]
   my_vote?: VoteRow | null
   vote_counts?: { [voted_for_user_id: string]: number }
 }
 interface FrontendGroupDetails {
-  group: GroupRow;
+  group: GroupRow
   members: {
     userId: string
     status: string
     username?: string
-    pfp_url?: string;
+    pfp_url?: string
   }[]
-  comments: CommentRow[] & { username?: string }[];
+  comments: CommentRow[] & { username?: string }[]
   questions: FrontendQuestion[]
 }
 
 interface FrontendCommentRow extends CommentRow {
-  username?: string;
+  username?: string
 }
 
-const editButtonIconSize = 22;
-const editButtonPaddingHorizontal = 12;
-const editButtonPaddingVertical = 8;
-const editButtonCalculatedWidth = editButtonIconSize + (editButtonPaddingHorizontal * 2);
+const editButtonIconSize = 22
+const editButtonPaddingHorizontal = 12
+const editButtonPaddingVertical = 8
+const editButtonCalculatedWidth = editButtonIconSize + editButtonPaddingHorizontal * 2
 
 const GroupDetailsScreen: React.FC = () => {
   const { partyId } = useLocalSearchParams<{ partyId: string }>()
@@ -75,14 +74,14 @@ const GroupDetailsScreen: React.FC = () => {
   const [newComment, setNewComment] = useState('')
   const [isPostingComment, setIsPostingComment] = useState(false)
   const [isSubmittingVote, setIsSubmittingVote] = useState<string | null>(null)
-  const [hasUserCommented, setHasUserCommented] = useState(false); // NEW STATE
+  const [hasUserCommented, setHasUserCommented] = useState(false) // NEW STATE
 
   const [error, setError] = useState<string | null>(null)
 
   const fetchGroupDetails = useCallback(async () => {
     if (!userGroupId) {
       setGroupDetails(null)
-      setHasUserCommented(false); // Reset if no group
+      setHasUserCommented(false) // Reset if no group
       return
     }
     setIsLoadingGroupDetails(true)
@@ -93,40 +92,71 @@ const GroupDetailsScreen: React.FC = () => {
         fetch(`${API_BASE_URL}/group/${userGroupId}`),
         fetch(`${API_BASE_URL}/group/${userGroupId}/comments`),
         fetch(`${API_BASE_URL}/group/${userGroupId}/members`),
-      ]);
+      ])
 
-      if (!questionRes.ok) throw new Error(await questionRes.json().then(d => d.message).catch(() => `Failed to fetch questions: ${questionRes.status}`))
+      if (!questionRes.ok)
+        throw new Error(
+          await questionRes
+            .json()
+            .then((d) => d.message)
+            .catch(() => `Failed to fetch questions: ${questionRes.status}`),
+        )
       const questionData: FrontendQuestion[] = await questionRes.json()
 
-      if (!groupRes.ok) throw new Error(await groupRes.json().then(d => d.message).catch(() => `Failed to fetch group data: ${groupRes.status}`))
+      if (!groupRes.ok)
+        throw new Error(
+          await groupRes
+            .json()
+            .then((d) => d.message)
+            .catch(() => `Failed to fetch group data: ${groupRes.status}`),
+        )
       const groupData: GroupRow = await groupRes.json()
 
-      if (!commentRes.ok) throw new Error(await commentRes.json().then(d => d.message).catch(() => `Failed to fetch comments: ${commentRes.status}`))
+      if (!commentRes.ok)
+        throw new Error(
+          await commentRes
+            .json()
+            .then((d) => d.message)
+            .catch(() => `Failed to fetch comments: ${commentRes.status}`),
+        )
       const commentData: CommentRow[] = await commentRes.json()
 
-      if (!memberRes.ok) throw new Error(await memberRes.json().then(d => d.message).catch(() => `Failed to fetch members: ${memberRes.status}`))
-      const memberData: { members: { userId: string; username?: string; pfp_url?: string; status: string }[]; count?: number } = await memberRes.json()
+      if (!memberRes.ok)
+        throw new Error(
+          await memberRes
+            .json()
+            .then((d) => d.message)
+            .catch(() => `Failed to fetch members: ${memberRes.status}`),
+        )
+      const memberData: {
+        members: { userId: string; username?: string; pfp_url?: string; status: string }[]
+        count?: number
+      } = await memberRes.json()
 
       const processedQuestions: FrontendQuestion[] = questionData.map((q) => {
-        const votesArray = Array.isArray(q.votes) ? q.votes : [];
+        const votesArray = Array.isArray(q.votes) ? q.votes : []
         const myVote = votesArray.find((v) => v.voter_user_id === userId)
         const voteCounts: { [voted_for_user_id: string]: number } = {}
-        votesArray.forEach((v) => { voteCounts[v.voted_for_user_id] = (voteCounts[v.voted_for_user_id] || 0) + 1 })
+        votesArray.forEach((v) => {
+          voteCounts[v.voted_for_user_id] = (voteCounts[v.voted_for_user_id] || 0) + 1
+        })
         return { ...q, votes: votesArray, my_vote: myVote || null, vote_counts: voteCounts }
       })
 
-      const processedComments = commentData.map(c => ({
+      const processedComments = commentData.map((c) => ({
         ...c,
-        username: memberData.members.find(m => m.userId === c.user_id)?.username || (c.user_id === userId ? "You" : "A member")
-      }));
+        username:
+          memberData.members.find((m) => m.userId === c.user_id)?.username ||
+          (c.user_id === userId ? 'You' : 'A member'),
+      }))
 
       // Check if the current user has commented
-      const userHasCommented = processedComments.some(comment => comment.user_id === userId);
-      setHasUserCommented(userHasCommented); // Update the state
+      const userHasCommented = processedComments.some((comment) => comment.user_id === userId)
+      setHasUserCommented(userHasCommented) // Update the state
 
       setGroupDetails({
         group: groupData,
-        members: memberData.members.filter(member => member.status === "joined"),
+        members: memberData.members.filter((member) => member.status === 'joined'),
         comments: processedComments,
         questions: processedQuestions,
       })
@@ -134,7 +164,7 @@ const GroupDetailsScreen: React.FC = () => {
       console.error('Fetch Group Details Error:', err)
       setError(err instanceof Error ? err.message : 'Could not load group details.')
       setGroupDetails(null)
-      setHasUserCommented(false); // Reset on error
+      setHasUserCommented(false) // Reset on error
     } finally {
       setIsLoadingGroupDetails(false)
     }
@@ -145,22 +175,31 @@ const GroupDetailsScreen: React.FC = () => {
       if (!authLoaded || !userId || !partyId) {
         if (authLoaded && !userId) setError('User not authenticated.')
         if (!partyId) setError('Party context is missing.')
-        setIsLoadingGroupStatus(false); return;
+        setIsLoadingGroupStatus(false)
+        return
       }
-      setIsLoadingGroupStatus(true); setError(null);
+      setIsLoadingGroupStatus(true)
+      setError(null)
       try {
         const response = await fetch(`${API_BASE_URL}/user/${userId}/party/${partyId}/group`)
         if (!response.ok) {
           if (response.status === 404) {
-            setUserGroupId(null); setError('You are not currently in a group for this party.')
+            setUserGroupId(null)
+            setError('You are not currently in a group for this party.')
           } else {
             const errorData = await response.json().catch(() => ({}))
-            throw new Error(errorData.message || `Failed to find user's group status: ${response.status}`)
+            throw new Error(
+              errorData.message || `Failed to find user's group status: ${response.status}`,
+            )
           }
         } else {
           const data: GroupRow & { status?: string } = await response.json()
-          if (data.group_id) { setUserGroupId(data.group_id) }
-          else { setUserGroupId(null); setError('You are not currently in a group for this party.') }
+          if (data.group_id) {
+            setUserGroupId(data.group_id)
+          } else {
+            setUserGroupId(null)
+            setError('You are not currently in a group for this party.')
+          }
         }
       } catch (err) {
         console.error('Find User Group Error:', err)
@@ -174,10 +213,11 @@ const GroupDetailsScreen: React.FC = () => {
   }, [authLoaded, userId, partyId])
 
   useEffect(() => {
-    if (userGroupId) { fetchGroupDetails() }
-    else {
-      setGroupDetails(null);
-      setHasUserCommented(false); // Reset if no group
+    if (userGroupId) {
+      fetchGroupDetails()
+    } else {
+      setGroupDetails(null)
+      setHasUserCommented(false) // Reset if no group
     }
   }, [userGroupId, fetchGroupDetails])
 
@@ -190,16 +230,25 @@ const GroupDetailsScreen: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment_text: newComment, user_id: userId }),
       })
-      if (!response.ok) throw new Error(await response.json().then(d => d.message).catch(() => 'Failed to post comment.'))
+      if (!response.ok)
+        throw new Error(
+          await response
+            .json()
+            .then((d) => d.message)
+            .catch(() => 'Failed to post comment.'),
+        )
       setNewComment('')
       const newCommentData: CommentRow = await response.json()
       setGroupDetails((prevDetails) => {
-        if (!prevDetails) return null;
-        const commenter = prevDetails.members.find(m => m.userId === newCommentData.user_id);
-        const commentWithUsername: FrontendCommentRow = { ...newCommentData, username: commenter?.username || (userId === newCommentData.user_id ? 'You' : 'A member') };
-        return { ...prevDetails, comments: [commentWithUsername, ...prevDetails.comments] };
-      });
-      setHasUserCommented(true); // User has now commented, disable future comments
+        if (!prevDetails) return null
+        const commenter = prevDetails.members.find((m) => m.userId === newCommentData.user_id)
+        const commentWithUsername: FrontendCommentRow = {
+          ...newCommentData,
+          username: commenter?.username || (userId === newCommentData.user_id ? 'You' : 'A member'),
+        }
+        return { ...prevDetails, comments: [commentWithUsername, ...prevDetails.comments] }
+      })
+      setHasUserCommented(true) // User has now commented, disable future comments
     } catch (err) {
       console.error('Post Comment Error:', err)
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not post comment.')
@@ -212,14 +261,24 @@ const GroupDetailsScreen: React.FC = () => {
     if (!userGroupId || !userId || isSubmittingVote) return
     setIsSubmittingVote(questionId)
     try {
-      const response = await fetch(`${API_BASE_URL}/group/${userGroupId}/questions/${questionId}/vote`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voted_for_user_id: votedForUserId, voter_user_id: userId }),
-      })
-      if (!response.ok) throw new Error(await response.json().then(d => d.message).catch(() => 'Failed to submit vote.'))
+      const response = await fetch(
+        `${API_BASE_URL}/group/${userGroupId}/questions/${questionId}/vote`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voted_for_user_id: votedForUserId, voter_user_id: userId }),
+        },
+      )
+      if (!response.ok)
+        throw new Error(
+          await response
+            .json()
+            .then((d) => d.message)
+            .catch(() => 'Failed to submit vote.'),
+        )
       fetchGroupDetails()
     } catch (err) {
-      console.error('Vote Error:', err);
+      console.error('Vote Error:', err)
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not submit vote.')
     } finally {
       setIsSubmittingVote(null)
@@ -230,20 +289,27 @@ const GroupDetailsScreen: React.FC = () => {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color={AppColors.white} />
-        <Text style={styles.loaderText}>{!authLoaded ? "Authenticating..." : "Finding your group..."}</Text>
+        <Text style={styles.loaderText}>
+          {!authLoaded ? 'Authenticating...' : 'Finding your group...'}
+        </Text>
       </View>
-    );
+    )
   }
 
   if (authLoaded && userId && !userGroupId && !isLoadingGroupStatus) {
     return (
       <View style={styles.loaderContainer}>
-        <Text style={styles.errorText}>{error || 'You are not currently in a group for this party.'}</Text>
-        <TouchableOpacity onPress={() => router.replace(partyId ? `/party/${partyId}` : '/dashboard')} style={styles.primaryButton}>
+        <Text style={styles.errorText}>
+          {error || 'You are not currently in a group for this party.'}
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.replace(partyId ? `/party/${partyId}` : '/dashboard')}
+          style={styles.primaryButton}
+        >
           <Text style={styles.primaryButtonText}>Back to Party</Text>
         </TouchableOpacity>
       </View>
-    );
+    )
   }
 
   if (userGroupId && isLoadingGroupDetails) {
@@ -252,17 +318,23 @@ const GroupDetailsScreen: React.FC = () => {
         <ActivityIndicator size="large" color={AppColors.white} />
         <Text style={styles.loaderText}>Loading Group Details...</Text>
       </View>
-    );
+    )
   }
 
   if (userGroupId && !isLoadingGroupDetails && (error || !groupDetails)) {
     return (
       <View style={styles.loaderContainer}>
-        <Text style={styles.errorText}>{error || 'Group details could not be loaded. The group might no longer exist or there was an issue.'}</Text>
+        <Text style={styles.errorText}>
+          {error ||
+            'Group details could not be loaded. The group might no longer exist or there was an issue.'}
+        </Text>
         <TouchableOpacity onPress={fetchGroupDetails} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Try Again</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.replace(partyId ? `/party/${partyId}` : '/dashboard')} style={[styles.primaryButton, { backgroundColor: AppColors.inputBg, marginTop: 10 }]}>
+        <TouchableOpacity
+          onPress={() => router.replace(partyId ? `/party/${partyId}` : '/dashboard')}
+          style={[styles.primaryButton, { backgroundColor: AppColors.inputBg, marginTop: 10 }]}
+        >
           <Text style={styles.primaryButtonText}>Back to Party</Text>
         </TouchableOpacity>
       </View>
@@ -272,16 +344,20 @@ const GroupDetailsScreen: React.FC = () => {
   if (!groupDetails || !userGroupId) {
     return (
       <View style={styles.loaderContainer}>
-        <Text style={styles.errorText}>Unable to display group details. Please ensure you are part of an active group.</Text>
-        <TouchableOpacity onPress={() => router.replace(partyId ? `/party/${partyId}` : '/dashboard')} style={styles.primaryButton}>
+        <Text style={styles.errorText}>
+          Unable to display group details. Please ensure you are part of an active group.
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.replace(partyId ? `/party/${partyId}` : '/dashboard')}
+          style={styles.primaryButton}
+        >
           <Text style={styles.primaryButtonText}>Back to Party</Text>
         </TouchableOpacity>
       </View>
-    );
+    )
   }
 
-
-  const isCreator = userId === groupDetails.group.creator_user_id;
+  const isCreator = userId === groupDetails.group.creator_user_id
   // const editButtonIconSize = 22; // Already declared outside
   // const editButtonPaddingHorizontal = 12; // Already declared outside
   // const editButtonCalculatedWidth = editButtonIconSize + (editButtonPaddingHorizontal * 2); // Already declared outside
@@ -307,7 +383,10 @@ const GroupDetailsScreen: React.FC = () => {
       <View style={styles.commentContent}>
         <Text style={styles.commenterUsername}>{item.username || 'A member'}</Text>
         <Text style={styles.commentText}>{item.comment_text}</Text>
-        <Text style={styles.commentTimestamp}>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text>
+        <Text style={styles.commentTimestamp}>
+          {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{' '}
+          - {new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+        </Text>
       </View>
     </View>
   )
@@ -322,13 +401,15 @@ const GroupDetailsScreen: React.FC = () => {
             style={[
               styles.voteOptionButton,
               question.my_vote?.voted_for_user_id === member.userId && styles.myVoteOption,
-              (isSubmittingVote === question.question_id) && styles.disabledButton,
+              isSubmittingVote === question.question_id && styles.disabledButton,
             ]}
             onPress={() => handleVote(question.question_id, member.userId)}
             disabled={isSubmittingVote === question.question_id || !!question.my_vote}
           >
             <Image
-              source={{ uri: member.pfp_url || `${API_BASE_URL}/user/${member.userId}/profile-picture` }}
+              source={{
+                uri: member.pfp_url || `${API_BASE_URL}/user/${member.userId}/profile-picture`,
+              }}
               style={styles.voteOptionPfp}
             />
             <Text style={styles.voteOptionText} numberOfLines={1}>
@@ -337,9 +418,7 @@ const GroupDetailsScreen: React.FC = () => {
             {question.my_vote?.voted_for_user_id === member.userId && (
               <CheckCircle size={18} color={AppColors.yellow400} style={styles.myVoteIcon} />
             )}
-            <Text style={styles.voteCountText}>
-              {question.vote_counts?.[member.userId] || 0}
-            </Text>
+            <Text style={styles.voteCountText}>{question.vote_counts?.[member.userId] || 0}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -366,7 +445,13 @@ const GroupDetailsScreen: React.FC = () => {
         {isCreator ? (
           <TouchableOpacity
             style={styles.editButton}
-            onPress={() => router.push(partyId && userGroupId ? `/party/${partyId}/groups/edit?groupId=${userGroupId}` : '/dashboard')}
+            onPress={() =>
+              router.push(
+                partyId && userGroupId
+                  ? `/party/${partyId}/groups/edit?groupId=${userGroupId}`
+                  : '/dashboard',
+              )
+            }
           >
             <Edit3 size={editButtonIconSize} color={AppColors.white} />
           </TouchableOpacity>
@@ -375,13 +460,10 @@ const GroupDetailsScreen: React.FC = () => {
         )}
       </View>
 
-
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeader}>
           <Users size={20} color={AppColors.primary} />
-          <Text style={styles.sectionTitle}>
-            Group Members ({groupDetails.members.length})
-          </Text>
+          <Text style={styles.sectionTitle}>Group Members ({groupDetails.members.length})</Text>
         </View>
         {groupDetails.members.length > 0 ? (
           <FlatList
@@ -400,24 +482,24 @@ const GroupDetailsScreen: React.FC = () => {
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeader}>
           <MessageSquare size={20} color={AppColors.primary} />
-          <Text style={styles.sectionTitle}>Comments</Text> {/* Changed title to reflect section content */}
+          <Text style={styles.sectionTitle}>Comments</Text>{' '}
+          {/* Changed title to reflect section content */}
         </View>
         <FlatList
-          data={[...groupDetails.comments]
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
-          }
+          data={[...groupDetails.comments].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          )}
           renderItem={renderCommentItem}
           keyExtractor={(item) => item.comment_id}
           style={styles.commentsList}
-          ListEmptyComponent={
-            <Text style={styles.emptyStateText}>No comments yet.</Text>
-          }
+          ListEmptyComponent={<Text style={styles.emptyStateText}>No comments yet.</Text>}
           scrollEnabled={false}
         />
         {hasUserCommented ? (
           <View style={styles.commentInputContainer}>
-            <Text style={styles.alreadyCommentedText}>You have already added a comment to this group.</Text>
+            <Text style={styles.alreadyCommentedText}>
+              You have already added a comment to this group.
+            </Text>
           </View>
         ) : (
           <View style={styles.commentInputContainer}>
@@ -433,7 +515,8 @@ const GroupDetailsScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 styles.postCommentButton,
-                (isPostingComment || newComment.trim() === '' || hasUserCommented) && styles.disabledButton, // Disable if user has commented
+                (isPostingComment || newComment.trim() === '' || hasUserCommented) &&
+                  styles.disabledButton, // Disable if user has commented
               ]}
               onPress={handlePostComment}
               disabled={isPostingComment || newComment.trim() === '' || hasUserCommented} // Disable if user has commented
@@ -544,7 +627,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 5,
     minWidth: editButtonCalculatedWidth,
-    height: editButtonIconSize + (editButtonPaddingVertical * 2),
+    height: editButtonIconSize + editButtonPaddingVertical * 2,
   },
   establishedStatusContainer: {
     paddingVertical: 8,
@@ -687,9 +770,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  voteOptionsContainer: {
-
-  },
+  voteOptionsContainer: {},
   voteOptionButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -739,7 +820,8 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingHorizontal: 10,
   },
-  alreadyCommentedText: { // NEW STYLE
+  alreadyCommentedText: {
+    // NEW STYLE
     flex: 1,
     color: AppColors.textGray,
     textAlign: 'center',
