@@ -26,21 +26,18 @@ import {
   User,
   CalendarDays,
   Briefcase,
-  Link2,
-  Instagram,
-  Settings,
-  Image as ImageIcon, // Renamed to avoid conflict with RN Image
-  Share2,
+  Link2, // Use Link2 for generic social links
+  Image as ImageIcon,
+  ArrowLeft,
 } from 'lucide-react-native'
 import Spinner from 'react-native-loading-spinner-overlay'
 
-import Colors, { API_BASE_URL } from '@/constants' // Assuming Colors is properly defined
+import Colors, { API_BASE_URL } from '@/constants'
 import InfoPopup from '@/components/InfoPopup'
 import { UserRow } from '@/types/database'
 
 interface UserProfileData {
   username: string
-  instagram_link?: string
   profile_picture_url?: string
   age?: number | string
   school?: string
@@ -49,18 +46,13 @@ interface UserProfileData {
   is_private?: boolean
 }
 
-type ActiveTab = 'details' | 'socials'
-
 const EditProfileScreen = () => {
   const router = useRouter()
   const { userId, isSignedIn, isLoaded } = useAuth()
 
-  // Tab State
-  const [activeTab, setActiveTab] = useState<ActiveTab>('details')
-
-  // Form States
   const [currentUsername, setCurrentUsername] = useState('')
-  const [instagramLink, setInstagramLink] = useState('')
+  // Removed instagramLink state
+
   const [profileImage, setProfileImage] = useState<ImagePicker.ImagePickerAsset | null>(null)
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null)
 
@@ -68,7 +60,7 @@ const EditProfileScreen = () => {
   const [school, setSchool] = useState('')
   const [portraitImage, setPortraitImage] = useState<ImagePicker.ImagePickerAsset | null>(null)
   const [portraitImageUri, setPortraitImageUri] = useState<string | null>(null)
-  const [socialsInput, setSocialsInput] = useState('')
+  const [socialsInput, setSocialsInput] = useState('') // This will now hold ALL social links
   const [isPrivate, setIsPrivate] = useState(false)
   const [isPrivateInfoPopupVisible, setIsPrivateInfoPopupVisible] = useState(false)
 
@@ -76,6 +68,15 @@ const EditProfileScreen = () => {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
+
+  // Helper to capitalize words in a string
+  const capitalizeWords = useCallback((str: string) => {
+    if (!str) return '' // Handle null/undefined input
+    return str
+      .split(' ')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }, [])
 
   const parseUserDescription = useCallback((descriptionString: string | null) => {
     const result = { age: '', school: '' }
@@ -89,8 +90,8 @@ const EditProfileScreen = () => {
       const key = part.substring(0, firstColonIndex).trim()
       const value = part.substring(firstColonIndex + 1).trim()
 
-      if (key === 'age') result.age = value
-      else if (key === 'school') result.school = value
+      if (key === 'age') result.age = value || '' // Ensure empty string if value is null/undefined
+      else if (key === 'school') result.school = value || '' // Ensure empty string if value is null/undefined
     })
     return result
   }, [])
@@ -103,39 +104,36 @@ const EditProfileScreen = () => {
       const response = await fetch(`${API_BASE_URL}/user/${userId}`)
       if (response.ok) {
         const data: UserRow = await response.json()
-        const userDescParsed = parseUserDescription(data.description)
 
-        setCurrentUsername(data.username || '')
-        const instagramEntry = data.socials?.split(',').find((v) => v.startsWith('instagram:'))
-        if (instagramEntry) {
-          setInstagramLink(instagramEntry.split(':')[1] || '')
-        } else {
-          setInstagramLink('')
-        }
+        setCurrentUsername(data.username ?? '')
+
+
+        const userDescParsed = parseUserDescription(data.description)
+        setAge(userDescParsed.age ?? '')
+        setSchool(userDescParsed.school ?? '')
+
+
+        // All socials now go into socialsInput, no special instagram handling
+        setSocialsInput(data.socials ?? '')
 
         setProfileImageUri(
-          `${API_BASE_URL}/user/${data.user_id}/profile-picture?timestamp=${new Date().getTime()}`,
-        ) // Added timestamp to prevent caching issues
-        setAge(userDescParsed.age)
-        setSchool(userDescParsed.school)
-        setPortraitImageUri(
-          `${API_BASE_URL}/user/${data.user_id}/portrait?timestamp=${new Date().getTime()}`,
-        ) // Added timestamp
-        setSocialsInput(
-          data.socials
-            ?.split(',')
-            .filter((v) => !v.startsWith('instagram:'))
-            .join(', ') ?? '',
+          data.user_id
+            ? `${API_BASE_URL}/user/${data.user_id}/profile-picture?timestamp=${new Date().getTime()}`
+            : null,
         )
+        setPortraitImageUri(
+          data.user_id
+            ? `${API_BASE_URL}/user/${data.user_id}/portrait?timestamp=${new Date().getTime()}`
+            : null,
+        )
+
         setIsPrivate(data.is_private == 1)
         setInitialDataLoaded(true)
       } else if (response.status === 404) {
         Alert.alert(
           'Profile Not Found',
           'No profile data exists for this user. You might need to create one.',
-          [
-            { text: 'OK', onPress: () => router.replace('/create-profile') }, // Or appropriate route
-          ],
+          [{ text: 'OK', onPress: () => router.replace('/create-profile') }],
         )
       } else {
         const errData = await response.json()
@@ -195,6 +193,11 @@ const EditProfileScreen = () => {
       return
     }
 
+    if (!currentUsername.trim()) {
+      Alert.alert('Validation Error', 'Username is required.')
+      return
+    }
+
     if (!age.trim()) {
       Alert.alert('Validation Error', 'Age is required.')
       return
@@ -210,49 +213,27 @@ const EditProfileScreen = () => {
 
     const formData = new FormData()
     formData.append('userId', userId)
+    formData.append('username', capitalizeWords(currentUsername.trim()))
 
-    const descriptionParts = []
-    if (age.trim()) descriptionParts.push(`age:${age.trim()}`)
-    if (school.trim()) descriptionParts.push(`school:${school.trim()}`)
-    formData.append('description', descriptionParts.join(','))
+    // Assuming age and school are now directly updated as separate fields on the backend
+    formData.append('age', age.trim())
+    formData.append('school', school.trim())
 
-    let finalSocialsArray = []
-    // Handle Instagram link
-    const trimmedInstagramLink = instagramLink.trim()
-    if (trimmedInstagramLink) {
-      if (
-        !trimmedInstagramLink.startsWith('http://') &&
-        !trimmedInstagramLink.startsWith('https://')
-      ) {
-        finalSocialsArray.push(`instagram:${trimmedInstagramLink.replace(/^@/, '')}`)
-      } else {
-        const match = trimmedInstagramLink.match(/(?:instagram\.com\/)([a-zA-Z0-9_.]+)/)
-        if (match && match[1]) {
-          finalSocialsArray.push(`instagram:${match[1]}`)
-        } else {
-          // If it's a URL but not a standard Insta, treat as other social
-          if (!trimmedInstagramLink.includes('instagram.com')) {
-            finalSocialsArray.push(trimmedInstagramLink)
-          }
-        }
-      }
-    }
-    // Handle other social links
+    let finalSocialsArray: string[] = []
     if (socialsInput.trim()) {
-      const otherLinks = socialsInput
-        .split(/[\s,;\n]+/)
+      const parsedLinks = socialsInput
+        .split(/[\s,;\n]+/) // Split by comma, space, semicolon, or newline
         .map((link) => link.trim())
         .filter(
           (link) =>
             link.length > 0 &&
             (link.startsWith('http://') ||
               link.startsWith('https://') ||
-              /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}([:/?#].*)?$/.test(link)),
+              /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}([:/?#].*)?$/.test(link)), // Basic URL validation
         )
-      finalSocialsArray.push(...otherLinks)
+      finalSocialsArray.push(...parsedLinks)
     }
-    // Remove duplicates just in case
-    finalSocialsArray = [...new Set(finalSocialsArray)]
+    finalSocialsArray = [...new Set(finalSocialsArray)] // Remove duplicates
 
     if (finalSocialsArray.length > 0) {
       formData.append('socials', finalSocialsArray.join(','))
@@ -290,7 +271,6 @@ const EditProfileScreen = () => {
         method: 'POST',
         body: formData,
         headers: {
-          // Important for FormData if your server needs it explicitly (often not for fetch)
           // 'Content-Type': 'multipart/form-data', // Fetch usually sets this automatically for FormData
         },
       })
@@ -299,7 +279,6 @@ const EditProfileScreen = () => {
 
       if (response.ok && responseData.success) {
         Alert.alert('Profile Updated!', 'Your changes have been saved.')
-        // Re-fetch with a slight delay to allow server-side image processing if any
         setTimeout(() => fetchProfileData(), 500)
       } else {
         setError(responseData.message || responseData.error || 'Failed to update profile.')
@@ -317,9 +296,8 @@ const EditProfileScreen = () => {
     }
   }
 
-  const capitalizeFirstLetter = (string: string) => {
-    return string.charAt(0).toUpperCase() + string.slice(1)
-  }
+  // Placeholder for username input if it's empty
+  const usernamePlaceholder = currentUsername.trim() === '' ? 'Your Username' : '';
 
   if (loading && !initialDataLoaded) {
     return (
@@ -374,193 +352,138 @@ const EditProfileScreen = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <ArrowLeft size={24} color={Colors.dark.gray200} />
+            </TouchableOpacity>
             <Edit3 size={40} color={Colors.dark.pink500} />
             <Text style={styles.title}>Edit Profile</Text>
             <Text style={styles.subtitle}>Manage your PartyLink identity.</Text>
           </View>
 
-          {/* Tab Navigation */}
-          <View style={styles.tabBar}>
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'details' && styles.activeTabButton]}
-              onPress={() => setActiveTab('details')}
-            >
-              <UserCircle
-                size={18}
-                color={activeTab === 'details' ? Colors.dark.pink500 : Colors.dark.gray300}
-              />
-              <Text
-                style={[
-                  styles.tabButtonText,
-                  activeTab === 'details' && styles.activeTabButtonText,
-                ]}
+          {/* --- Section: Visuals --- */}
+          <View style={styles.dashboardSection}>
+            <Text style={styles.sectionTitle}>Avatar & Portrait</Text>
+            <View style={styles.visualsRow}>
+              <TouchableOpacity onPress={() => pickImage('profile')} style={styles.imagePicker}>
+                {profileImageUri ? (
+                  <Image source={{ uri: profileImageUri }} style={styles.profileImagePreview} />
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <Camera size={30} color={Colors.dark.gray300} />
+                    <Text style={styles.imagePickerTextSmall}>Profile Pic</Text>
+                  </View>
+                )}
+                <View style={styles.editOverlay}>
+                  <ImageIcon size={16} color={Colors.dark.white} />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => pickImage('portrait')}
+                style={styles.portraitImagePicker}
               >
-                Profile Details
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'socials' && styles.activeTabButton]}
-              onPress={() => setActiveTab('socials')}
-            >
-              <Share2
-                size={18}
-                color={activeTab === 'socials' ? Colors.dark.pink500 : Colors.dark.gray300}
-              />
-              <Text
-                style={[
-                  styles.tabButtonText,
-                  activeTab === 'socials' && styles.activeTabButtonText,
-                ]}
-              >
-                Social Links
-              </Text>
-            </TouchableOpacity>
+                {portraitImageUri ? (
+                  <Image source={{ uri: portraitImageUri }} style={styles.portraitImagePreview} />
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <UserCircle size={30} color={Colors.dark.gray300} />
+                    <Text style={styles.imagePickerTextSmall}>Portrait Pic</Text>
+                    <Text style={styles.imagePickerSubtextSmall}>(3:4)</Text>
+                  </View>
+                )}
+                <View style={styles.editOverlay}>
+                  <ImageIcon size={16} color={Colors.dark.white} />
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Content based on active tab */}
-          {activeTab === 'details' && (
-            <>
-              {/* --- Section: Visuals --- */}
-              <View style={styles.dashboardSection}>
-                <Text style={styles.sectionTitle}>Avatar & Portrait</Text>
-                <View style={styles.visualsRow}>
-                  <TouchableOpacity onPress={() => pickImage('profile')} style={styles.imagePicker}>
-                    {profileImageUri ? (
-                      <Image source={{ uri: profileImageUri }} style={styles.profileImagePreview} />
-                    ) : (
-                      <View style={styles.imagePlaceholder}>
-                        <Camera size={30} color={Colors.dark.gray300} />
-                        <Text style={styles.imagePickerTextSmall}>Profile Pic</Text>
-                      </View>
-                    )}
-                    <View style={styles.editOverlay}>
-                      <ImageIcon size={16} color={Colors.dark.white} />
-                    </View>
-                  </TouchableOpacity>
+          {/* --- Section: Basic Information --- */}
+          <View style={styles.dashboardSection}>
+            <Text style={styles.sectionTitle}>Basic Information</Text>
+            <View style={styles.inputGroup}>
+              {renderLabel('Name (Username)', User)}
+              <TextInput
+                style={styles.input}
+                value={currentUsername}
+                onChangeText={setCurrentUsername}
+                editable={true}
+                placeholder={usernamePlaceholder}
+                placeholderTextColor={Colors.dark.gray400}
+                autoCapitalize="words"
+              />
+              <Text style={styles.inputHint}>Your unique identifier on PartyLink.</Text>
+            </View>
 
-                  <TouchableOpacity
-                    onPress={() => pickImage('portrait')}
-                    style={styles.portraitImagePicker}
-                  >
-                    {portraitImageUri ? (
-                      <Image
-                        source={{ uri: portraitImageUri }}
-                        style={styles.portraitImagePreview}
-                      />
-                    ) : (
-                      <View style={styles.imagePlaceholder}>
-                        <UserCircle size={30} color={Colors.dark.gray300} />
-                        <Text style={styles.imagePickerTextSmall}>Portrait Pic</Text>
-                        <Text style={styles.imagePickerSubtextSmall}>(3:4)</Text>
-                      </View>
-                    )}
-                    <View style={styles.editOverlay}>
-                      <ImageIcon size={16} color={Colors.dark.white} />
-                    </View>
-                  </TouchableOpacity>
-                </View>
+            <View style={styles.inputGroup}>
+              {renderLabel('Age*', CalendarDays)}
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., 21"
+                value={age}
+                onChangeText={setAge}
+                placeholderTextColor={Colors.dark.gray400}
+                keyboardType="numeric"
+                maxLength={3}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              {renderLabel('Career/School', Briefcase)}
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., Software Engineer or State University"
+                value={school}
+                onChangeText={setSchool}
+                placeholderTextColor={Colors.dark.gray400}
+                autoCapitalize="words"
+              />
+            </View>
+
+            {/* --- Social Links --- */}
+            <View style={styles.socialLinksSection}>
+              <Text style={styles.sectionTitle}>Social Links</Text>
+              <View style={[styles.inputGroup, { marginBottom: 0 }]}>
+                {renderLabel('Your Social Media Links', Link2)} {/* Generic label */}
+                <TextInput
+                  style={[styles.input]}
+                  placeholder="e.g., instagram.com/user, twitter.com/user, tiktok.com/@user" // Updated placeholder
+                  value={socialsInput}
+                  onChangeText={setSocialsInput}
+                  placeholderTextColor={Colors.dark.gray400}
+                  multiline
+                  numberOfLines={4}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+                <Text style={styles.inputHint}>
+                  Enter full URLs for your social media profiles. Separate multiple links with a
+                  comma, space, or new line.
+                </Text>
               </View>
+            </View>
+            {/* --- End Social Links Section --- */}
+          </View>
 
-              {/* --- Section: Basic Information --- */}
-              <View style={styles.dashboardSection}>
-                <Text style={styles.sectionTitle}>Basic Information</Text>
-                <View style={styles.inputGroup}>
-                  {renderLabel('Name (Username)', User)}
-                  <TextInput
-                    style={[styles.input, styles.readOnlyInput]}
-                    value={capitalizeFirstLetter(currentUsername)}
-                    editable={false}
-                    placeholderTextColor={Colors.dark.gray400}
-                  />
-                  <Text style={styles.inputHint}>Usernames cannot be changed after creation.</Text>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  {renderLabel('Age*', CalendarDays)}
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g., 21"
-                    value={age}
-                    onChangeText={setAge}
-                    placeholderTextColor={Colors.dark.gray400}
-                    keyboardType="numeric"
-                    maxLength={3}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  {renderLabel('Career/School', Briefcase)}
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g., Software Engineer or State University"
-                    value={school}
-                    onChangeText={setSchool}
-                    placeholderTextColor={Colors.dark.gray400}
-                    autoCapitalize="words"
-                  />
-                </View>
-              </View>
-
-              {/* --- Section: Account Settings --- */}
-              <View style={styles.dashboardSection}>
-                <Text style={styles.sectionTitle}>Account Settings</Text>
-                <View style={[styles.inputGroup, styles.privateToggleContainer]}>
-                  <TouchableOpacity
-                    onPress={() => setIsPrivate(!isPrivate)}
-                    style={[styles.checkbox, isPrivate && styles.checkboxChecked]}
-                  >
-                    {isPrivate && <CheckCircle size={18} color={Colors.dark.pink500} />}
-                  </TouchableOpacity>
-                  <Text style={styles.privateToggleText}>Make my account private</Text>
-                  <TouchableOpacity
-                    onPress={() => setIsPrivateInfoPopupVisible(true)}
-                    style={styles.helpButton}
-                  >
-                    <ShieldQuestion size={20} color={Colors.dark.gray300} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </>
-          )}
-
-          {activeTab === 'socials' && (
-            <>
-              {/* --- Section: Social Links --- */}
-              <View style={styles.dashboardSection}>
-                <Text style={styles.sectionTitle}>Social Links</Text>
-                <View style={styles.inputGroup}>
-                  {renderLabel('Instagram Handle or Link', Instagram)}
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g., your_handle or instagram.com/yourprofile"
-                    value={instagramLink}
-                    onChangeText={setInstagramLink}
-                    placeholderTextColor={Colors.dark.gray400}
-                    keyboardType="url"
-                    autoCapitalize="none"
-                  />
-                </View>
-
-                <View style={[styles.inputGroup, { marginBottom: 0 }]}>
-                  {renderLabel('Other Social Links', Link2)}
-                  <TextInput
-                    style={[styles.input]}
-                    placeholder="e.g., twitter.com/user, tiktok.com/@user"
-                    value={socialsInput}
-                    onChangeText={setSocialsInput}
-                    placeholderTextColor={Colors.dark.gray400}
-                    multiline
-                    numberOfLines={4}
-                    autoCapitalize="none"
-                    keyboardType="url"
-                  />
-                  <Text style={styles.inputHint}>
-                    Separate multiple links with a comma, space, or new line.
-                  </Text>
-                </View>
-              </View>
-            </>
-          )}
+          {/* --- Section: Account Settings --- */}
+          <View style={styles.dashboardSection}>
+            <Text style={styles.sectionTitle}>Account Settings</Text>
+            <View style={[styles.inputGroup, styles.privateToggleContainer]}>
+              <TouchableOpacity
+                onPress={() => setIsPrivate(!isPrivate)}
+                style={[styles.checkbox, isPrivate && styles.checkboxChecked]}
+              >
+                {isPrivate && <CheckCircle size={18} color={Colors.dark.pink500} />}
+              </TouchableOpacity>
+              <Text style={styles.privateToggleText}>Make my account private</Text>
+              <TouchableOpacity
+                onPress={() => setIsPrivateInfoPopupVisible(true)}
+                style={styles.helpButton}
+              >
+                <ShieldQuestion size={20} color={Colors.dark.gray300} />
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -611,13 +534,21 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 20 : 20, // Adjusted from 60/40 due to KeyboardAvoidingView
+    paddingTop: Platform.OS === 'ios' ? 20 : 20,
     paddingBottom: 40,
     paddingHorizontal: 15,
   },
   headerContainer: {
     alignItems: 'center',
     marginBottom: 25,
+    width: '100%',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    padding: 10,
+    zIndex: 1,
+    top: Platform.OS === 'ios' ? 0 : 5,
   },
   title: {
     fontSize: 28,
@@ -632,51 +563,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 15,
   },
-  // --- Tab Styles ---
-  tabBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    maxWidth: 500,
-    marginBottom: 20,
-    backgroundColor: Colors.dark.inputBg,
-    borderRadius: 12,
-    padding: 5,
-    borderWidth: 1,
-    borderColor: Colors.dark.gray700,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    marginHorizontal: 2, // Add some space between buttons
-  },
-  activeTabButton: {
-    backgroundColor: Colors.dark.primaryBg, // A slightly different shade
-    shadowColor: Colors.dark.pink500,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  tabButtonText: {
-    marginLeft: 8,
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.dark.gray300,
-  },
-  activeTabButtonText: {
-    color: Colors.dark.pink500,
-  },
-  // --- End Tab Styles ---
   dashboardSection: {
     width: '100%',
     maxWidth: 500,
-    backgroundColor: Colors.dark.inputBg, // Consider a slightly lighter shade than primaryBg
+    backgroundColor: Colors.dark.inputBg,
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
@@ -807,11 +697,16 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     paddingTop: 15,
   },
+  socialLinksSection: {
+    marginTop: 10,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: Colors.dark.gray600,
+  },
   privateToggleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
-    // Removed marginBottom from here as inputGroup already has it
   },
   checkbox: {
     width: 24,
@@ -819,14 +714,14 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 2,
     borderColor: Colors.dark.gray500,
-    backgroundColor: Colors.dark.gray700, // Default background
+    backgroundColor: Colors.dark.gray700,
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxChecked: {
-    borderColor: Colors.dark.pink500, // Border color when checked
-    backgroundColor: Colors.dark.gray800, // Background when checked
+    borderColor: Colors.dark.pink500,
+    backgroundColor: Colors.dark.gray800,
   },
   privateToggleText: {
     color: Colors.dark.gray200,
@@ -848,7 +743,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     maxWidth: 450,
-    marginTop: 20, // Ensure spacing above save button
+    marginTop: 20,
     shadowColor: Colors.dark.pink700,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -880,7 +775,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
     textAlign: 'left',
-    color: Colors.dark.gray200, // Lighter for better readability in popup
+    color: Colors.dark.gray200,
     lineHeight: 23,
   },
   popupList: {
