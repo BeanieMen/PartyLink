@@ -24,17 +24,27 @@ import {
   MessageCircle,
   Users,
   Compass,
+  // Plus, // Optional: if you want to use Lucide Plus icon
 } from 'lucide-react-native'
 import QRCodeSVG from 'react-native-qrcode-svg'
-import Colors, { API_BASE_URL } from '@/constants'
+import Colors, { API_BASE_URL } from '@/constants' // Assuming API_BASE_URL is correctly exported
 import { PartyRow, UserRow, GroupRow } from '@/types/database'
 
 const AppColors = Colors.dark
 const { width: screenWidth } = Dimensions.get('window')
 
+interface GroupMemberBase {
+  userId: string
+  username?: string
+  status: string
+}
 interface GroupMembersApiResponse {
-  members: { userId: string; username?: string; status: string }[]
+  members: GroupMemberBase[]
   count?: number
+}
+
+interface DetailedGroupMember extends GroupMemberBase {
+  profilePictureUrl?: string
 }
 
 const PartyLandingScreen: React.FC = () => {
@@ -55,6 +65,7 @@ const PartyLandingScreen: React.FC = () => {
   const [groupStatus, setGroupStatus] = useState<string | null>(null)
   const [showPartyDetailsDropdown, setShowPartyDetailsDropdown] = useState<boolean>(false)
   const [isEstablishingGroup, setIsEstablishingGroup] = useState<boolean>(false)
+  const [detailedGroupMembers, setDetailedGroupMembers] = useState<DetailedGroupMember[]>([])
 
   const fetchPartyAndUserData = useCallback(async () => {
     if (!partyId) {
@@ -71,6 +82,7 @@ const PartyLandingScreen: React.FC = () => {
 
     setLoading(true)
     setCheckingGroup(true)
+    setDetailedGroupMembers([]) // Reset on fresh fetch
 
     try {
       const partyResponse = await fetch(`${API_BASE_URL}/party/${partyId}`)
@@ -99,10 +111,12 @@ const PartyLandingScreen: React.FC = () => {
         if (userGroupResponse.status === 404) {
           setUserGroup(undefined)
           setGroupStatus(null)
+          setDetailedGroupMembers([])
         } else if (!userGroupResponse.ok) {
           console.error(`Failed to fetch user group: ${userGroupResponse.status}`)
           setUserGroup(undefined)
           setGroupStatus(null)
+          setDetailedGroupMembers([])
         } else {
           const groupData: GroupRow = await userGroupResponse.json()
           setUserGroup(groupData)
@@ -114,21 +128,38 @@ const PartyLandingScreen: React.FC = () => {
             if (!membersResponse.ok) {
               console.error(`Failed to fetch group member status: ${membersResponse.status}`)
               setGroupStatus(null)
+              setDetailedGroupMembers([])
             } else {
               const membersData: GroupMembersApiResponse = await membersResponse.json()
-              const status = membersData.members.find((member) => member.userId === userId)?.status
-              setGroupStatus(status || null)
+              const currentUserInGroupStatus = membersData.members.find(
+                (member) => member.userId === userId,
+              )?.status
+              setGroupStatus(currentUserInGroupStatus || null)
+
+              if (membersData.members && membersData.members.length > 0) {
+                const resolvedDetailedMembers = membersData.members.map((member) => {
+                  return {
+                    ...member,
+                    profilePictureUrl: `${API_BASE_URL}/user/${member.userId}/profile-picture`,
+                  }
+                })
+                setDetailedGroupMembers(resolvedDetailedMembers)
+              } else {
+                setDetailedGroupMembers([])
+              }
             }
           } else {
             console.warn('Fetched group data but group_id is missing.')
             setGroupStatus(null)
             setUserGroup(undefined)
+            setDetailedGroupMembers([])
           }
         }
       } else {
         setCurrentUser(null)
         setUserGroup(undefined)
         setGroupStatus(null)
+        setDetailedGroupMembers([])
       }
     } catch (error) {
       console.error('Error fetching party and user data:', error)
@@ -136,6 +167,7 @@ const PartyLandingScreen: React.FC = () => {
       setCurrentUser(null)
       setUserGroup(undefined)
       setGroupStatus(null)
+      setDetailedGroupMembers([])
     } finally {
       setCheckingGroup(false)
       setLoading(false)
@@ -168,7 +200,7 @@ const PartyLandingScreen: React.FC = () => {
         },
         body: JSON.stringify({
           creator_user_id: userId,
-          creator_username: currentUser.username,
+          creator_username: currentUser.username, // Ensure currentUser.username is available
         }),
       })
 
@@ -180,8 +212,8 @@ const PartyLandingScreen: React.FC = () => {
       const newGroup: GroupRow = await response.json()
 
       if (newGroup && newGroup.group_id) {
-        await fetchPartyAndUserData()
-        router.replace(`/party/${partyId}/groups/edit`)
+        await fetchPartyAndUserData() // Refetch to update group status and members
+        router.replace(`/party/${partyId}/groups/edit`) // Navigate to edit/setup screen
       } else {
         throw new Error('Group ID not returned from API.')
       }
@@ -206,7 +238,7 @@ const PartyLandingScreen: React.FC = () => {
 
   const handleNavigateToChats = (): void => {
     if (partyId && userGroup?.group_id) {
-      router.push(`/party/${partyId}/dms`)
+      router.push(`/party/${partyId}/dms`) // Assuming this is the correct route for group DMs
     } else {
       Alert.alert('Error', 'Group chat not available or group information missing.')
     }
@@ -239,7 +271,12 @@ const PartyLandingScreen: React.FC = () => {
           onPress: async () => {
             setIsEstablishingGroup(true)
             try {
-              const response = await fetch(`${API_BASE_URL}/group/${userGroup.group_id}/establish`)
+              // Assuming the establish endpoint doesn't require a body or is a PUT/PATCH
+              const response = await fetch(`${API_BASE_URL}/group/${userGroup.group_id}/establish`, {
+                method: 'POST', // Or 'PUT', 'PATCH' depending on your API design
+                headers: { 'Content-Type': 'application/json' },
+                // body: JSON.stringify({ established: true }), // If your API expects a body
+              })
 
               if (!response.ok) {
                 const errorData = await response
@@ -248,7 +285,7 @@ const PartyLandingScreen: React.FC = () => {
                 throw new Error(errorData.message || `Server error: ${response.status}`)
               }
               Alert.alert('Success', 'Group established! You can now explore the scene.')
-              await fetchPartyAndUserData()
+              await fetchPartyAndUserData() // Refresh data
             } catch (err) {
               console.error('Establish Group Error:', err)
               Alert.alert(
@@ -354,17 +391,80 @@ const PartyLandingScreen: React.FC = () => {
         )}
       </View>
 
-      {/* User Profile - Centered, Bigger, BELOW Party Details Dropdown */}
+      {/* User Profile & Party Squad - Centered, BELOW Party Details Dropdown */}
       {userId && currentUser && (
-        <View style={styles.profileContainer}>
-          <TouchableOpacity onPress={() => router.push('/user/update')}>
-            <Image
-              source={{ uri: `${API_BASE_URL}/user/${userId}/profile-picture` }}
-              style={styles.profilePictureCircle}
-              onError={(e) => console.log('Profile Image Load Error:', e.nativeEvent.error)}
-            />
-          </TouchableOpacity>
-          <Text style={styles.profileUsernameText}>{currentUser.username || 'Update Profile'}</Text>
+        <View style={styles.profileSectionContainer}>
+          <Text style={styles.sectionHeader}>Your Squad</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.squadMembersScrollContainer}
+          >
+            {/* Current User's Profile */}
+            <TouchableOpacity
+              onPress={() => router.push('/user/update')}
+              style={styles.squadMemberItem}
+            >
+              <Image
+                source={{ uri: `${API_BASE_URL}/user/${userId}/profile-picture` }}
+                style={[
+                  styles.squadMemberPicture,
+                  userGroup && userId === userGroup.creator_user_id && styles.leaderPictureBorder,
+                ]}
+                onError={(e) =>
+                  console.log('Current User Profile Image Load Error:', e.nativeEvent.error)
+                }
+              />
+              <Text style={styles.squadMemberName} numberOfLines={1}>
+                {currentUser.username || 'Your Profile'}
+              </Text>
+              {userGroup && userId === userGroup.creator_user_id && (
+                <View style={styles.leaderBadge}>
+                  <Text style={styles.leaderBadgeText}>LEADER</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Other Joined Group Members' Profiles */}
+            {userGroup &&
+              detailedGroupMembers
+                .filter((member) => member.userId !== userId && member.status === 'joined')
+                .map((member) => (
+                  <TouchableOpacity key={member.userId} style={styles.squadMemberItem}>
+                    <Image
+                      source={{ uri: member.profilePictureUrl }}
+                      style={styles.squadMemberPicture}
+                      onError={(e) =>
+                        console.log(
+                          `Profile Image Load Error for ${member.username}:`,
+                          e.nativeEvent.error,
+                        )
+                      }
+                    />
+                    <Text style={styles.squadMemberName} numberOfLines={1}>
+                      {member.username || 'Member'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+
+            {/* Add More People Icon (for creator of an existing group) */}
+            {userGroup &&
+              userId === userGroup.creator_user_id &&
+              groupStatus === 'joined' && ( // Only show if in a group and is creator
+                <TouchableOpacity
+                  style={[styles.squadMemberItem, styles.addMemberButtonContainer]}
+                  onPress={() => {
+                    router.push(`/party/${partyId}/groups/edit`) // Or your specific invite/edit route
+                  }}
+                >
+                  <View style={styles.addMemberIconCircle}>
+                    <Text style={styles.addMemberPlusIcon}>+</Text>
+                    {/* Or use an icon: <Plus size={24} color={AppColors.gray300} /> */}
+                  </View>
+                  <Text style={styles.squadMemberName}>Add New</Text>
+                </TouchableOpacity>
+              )}
+          </ScrollView>
         </View>
       )}
 
@@ -442,7 +542,7 @@ const PartyLandingScreen: React.FC = () => {
                 Before connecting with others, establish who you are going with!
               </Text>
               <TouchableOpacity
-                style={[styles.ctaButton, isCreatingGroup && styles.disabledButton]}
+                style={[styles.ctaButton, (isCreatingGroup || !currentUser) && styles.disabledButton]}
                 onPress={handleCreateGroup}
                 disabled={isCreatingGroup || !currentUser}
               >
@@ -536,7 +636,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     alignItems: 'center',
-    marginBottom: 20, // Increased for spacing after header
+    marginBottom: 20,
   },
   backButtonContainer: {
     flexDirection: 'row',
@@ -563,14 +663,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  // Replaced 'section' with 'mainSection' for general content blocks
   mainSection: {
     width: screenWidth - 40,
-    marginVertical: 10, // Slightly reduced vertical margin between blocks
+    marginVertical: 10,
     alignItems: 'center',
   },
-  // Removed sectionTitle
-  // Ticket Button
   ticketButton: {
     backgroundColor: AppColors.primary,
     paddingVertical: 18,
@@ -590,8 +687,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-
-  // Party Details Dropdown Button
   partyDetailsDropdownButton: {
     backgroundColor: AppColors.cardBg,
     flexDirection: 'row',
@@ -610,7 +705,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  // Event Summary Card (Dropdown Content)
   eventSummaryCard: {
     backgroundColor: AppColors.cardBg,
     borderRadius: 12,
@@ -653,15 +747,102 @@ const styles = StyleSheet.create({
     color: AppColors.gray300,
     marginLeft: 12,
   },
-  // Profile Container and Picture (Circle)
+
+  // --- NEW STYLES FOR PROFILE SQUAD ---
+  profileSectionContainer: {
+    width: screenWidth - 40, // Match mainSection width
+    marginVertical: 20,
+    alignItems: 'center', // Center the ScrollView if its content is narrower
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: AppColors.white,
+    marginBottom: 15,
+    alignSelf: 'flex-start',
+  },
+  squadMembersScrollContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 5, // Padding for items inside scroll
+    paddingHorizontal: 5, // Ensure first item doesn't stick to edge
+  },
+  squadMemberItem: {
+    alignItems: 'center',
+    marginRight: 12, // Spacing between members
+    width: 75, // Fixed width for each item including text
+  },
+  squadMemberPicture: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: AppColors.primary, // Default border for members
+    marginBottom: 6,
+  },
+  leaderPictureBorder: {
+    borderColor: AppColors.accent, // Special border for the leader
+    borderWidth: 2.5,
+  },
+  leaderBadge: {
+    backgroundColor: AppColors.accent,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    position: 'absolute',
+    top: 42, // Adjust to sit nicely on/below the image
+    // right: -5, // Example positioning
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 1,
+  },
+  leaderBadgeText: {
+    color: AppColors.white,
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  squadMemberName: {
+    fontSize: 12,
+    color: AppColors.gray300,
+    marginTop: 2,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  addMemberButtonContainer: {
+    // Uses squadMemberItem for base, can add specifics if needed
+    // e.g., different margin if it's the last item
+  },
+  addMemberIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: AppColors.gray500,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+    backgroundColor: AppColors.darkerBg, // Slight background tint
+  },
+  addMemberPlusIcon: {
+    fontSize: 28,
+    color: AppColors.gray300,
+    fontWeight: '300',
+  },
+  // --- END OF NEW PROFILE SQUAD STYLES ---
+
+  // Old profile styles (can be removed if new squad display fully replaces them)
+  /*
   profileContainer: {
     alignItems: 'center',
-    marginVertical: 20, // Adjusted margin for standalone profile
+    marginVertical: 20, 
   },
   profilePictureCircle: {
     width: 90,
     height: 90,
-    borderRadius: 45, // Half of width/height for perfect circle
+    borderRadius: 45,
     borderWidth: 3,
     borderColor: AppColors.primary,
   },
@@ -669,9 +850,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: AppColors.white,
-    marginTop: 10, // Space below picture
+    marginTop: 10,
   },
-  // CTA/Info Cards (Updated for group status)
+  */
   infoCard: {
     backgroundColor: AppColors.cardBg,
     borderRadius: 12,
@@ -680,7 +861,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: AppColors.gray700,
-    marginTop: 10, // Added margin top as title is removed
+    marginTop: 10,
   },
   infoText: {
     fontSize: 16,
@@ -729,7 +910,7 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: AppColors.gray600,
-    borderColor: AppColors.gray700,
+    borderColor: AppColors.gray700, // For outline buttons if they also get disabled
     opacity: 0.7,
   },
   signInPrompt: {
@@ -738,13 +919,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
-
-  // Group Action Buttons (Grid)
   groupActionsGrid: {
     width: '100%',
     flexDirection: 'column',
     alignItems: 'center',
-    marginTop: 10, // Added margin top as title is removed
+    marginTop: 10,
   },
   groupActionButton: {
     backgroundColor: AppColors.cardBg,
@@ -760,7 +939,7 @@ const styles = StyleSheet.create({
     borderColor: AppColors.gray700,
   },
   groupActionButtonHighlight: {
-    backgroundColor: AppColors.darkerBg,
+    backgroundColor: AppColors.darkerBg, // Or a specific highlight bg
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
@@ -770,10 +949,10 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: AppColors.accent,
+    borderColor: AppColors.accent, // Accent border for highlight
   },
   groupActionButtonDisabled: {
-    backgroundColor: AppColors.gray800,
+    backgroundColor: AppColors.gray800, // Darker, less prominent
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
@@ -805,9 +984,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   dropdownActivityIndicator: {
-    marginRight: 10,
+    // marginRight: 10, // If icon is also present
+    // If it replaces the icon, no margin needed, or adjust as per layout
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',

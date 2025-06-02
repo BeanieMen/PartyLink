@@ -217,8 +217,8 @@ const GroupEditsScreen: React.FC = () => {
         const errorData = await response.json().catch(() => ({ message: 'Failed to search users' }))
         throw new Error(errorData.message)
       }
-      let users: UserRow[] = await response.json()
-      users = users.filter((u) => u.user_id !== userId)
+      let users: (UserRow & {status: boolean})[] = await response.json()
+      users = users.filter((u) => u.user_id !== userId && u.status === true)
       const filteredUsers = users.filter((u) =>
         u.username?.toLowerCase().startsWith(searchQuery.toLowerCase()),
       )
@@ -566,7 +566,7 @@ const GroupEditsScreen: React.FC = () => {
                 renderItem={renderSearchResultItem}
                 keyExtractor={(user) => user.user_id}
                 style={styles.searchResultsList}
-                scrollEnabled={false}
+                scrollEnabled={true}
               />
             )}
             {!isSearchingUsers && searchResults.length === 0 && searchQuery.trim() !== '' && (

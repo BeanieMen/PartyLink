@@ -162,4 +162,4 @@ export default {
 }
 
 // export const API_BASE_URL = 'http://140.238.160.248:3000'
-export const API_BASE_URL = 'http://192.168.1.17:3000'
+export const API_BASE_URL = 'http://192.168.1.6:3000'
