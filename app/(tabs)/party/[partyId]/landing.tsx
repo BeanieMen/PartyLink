@@ -272,11 +272,7 @@ const PartyLandingScreen: React.FC = () => {
             setIsEstablishingGroup(true)
             try {
               // Assuming the establish endpoint doesn't require a body or is a PUT/PATCH
-              const response = await fetch(`${API_BASE_URL}/group/${userGroup.group_id}/establish`, {
-                method: 'POST', // Or 'PUT', 'PATCH' depending on your API design
-                headers: { 'Content-Type': 'application/json' },
-                // body: JSON.stringify({ established: true }), // If your API expects a body
-              })
+              const response = await fetch(`${API_BASE_URL}/group/${userGroup.group_id}/establish`)
 
               if (!response.ok) {
                 const errorData = await response
