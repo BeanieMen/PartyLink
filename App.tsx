@@ -1,20 +1,49 @@
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
+import { SpaceGrotesk_400Regular, SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
+import { prepareApiClient } from './src/api/client';
+import { LaunchCurtain } from './src/components/LaunchCurtain';
+import { AppNavigator } from './src/navigation/AppNavigator';
+import { AppProviders } from './src/providers/AppProviders';
 
 export default function App() {
+  const [isApiReady, setIsApiReady] = useState(false);
+  const [isCurtainDone, setIsCurtainDone] = useState(false);
+
+  const [fontsLoaded] = useFonts({
+    BebasNeue_400Regular,
+    SpaceGrotesk_400Regular,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_700Bold,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    prepareApiClient()
+      .catch(() => undefined)
+      .finally(() => {
+        if (isMounted) {
+          setIsApiReady(true);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const isAppReady = fontsLoaded && isApiReady;
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <AppProviders>
+      <StatusBar style="light" />
+
+      {isAppReady ? <AppNavigator /> : null}
+
+      {!isCurtainDone ? <LaunchCurtain canReveal={isAppReady} onRevealComplete={() => setIsCurtainDone(true)} /> : null}
+    </AppProviders>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
