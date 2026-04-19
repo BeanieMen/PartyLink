@@ -6,6 +6,10 @@ export const queryKeys = {
   myGroups: (userId: string | null) => ['my-groups', userId] as const,
   pendingGroupInvites: (userId: string | null, partyId?: string) => ['pending-group-invites', userId, partyId ?? 'all'] as const,
   groupMembers: (groupId: string) => ['group-members', groupId] as const,
+  groupOverview: (groupId: string) => ['group-overview', groupId] as const,
+  groupJoinCandidates: (partyId: string, userId: string | null, query: string) =>
+    ['group-join-candidates', partyId, userId, query] as const,
+  groupDiscovery: (partyId: string, groupId: string, userId: string | null) => ['group-discovery', partyId, groupId, userId] as const,
   groupInviteCandidates: (partyId: string, groupId: string, query: string) =>
     ['group-invite-candidates', partyId, groupId, query] as const,
   me: (userId: string | null) => ['me', userId] as const,

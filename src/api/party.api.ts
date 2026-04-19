@@ -35,6 +35,7 @@ export interface PartyGroup {
 }
 
 export interface MyMembership {
+  id: string;
   status: string;
   role: string;
 }
@@ -82,6 +83,80 @@ export interface JoinedGroupSummary {
   role: string;
   membershipStatus: string;
   createdBy: string;
+}
+
+export interface JoinCrewLeader {
+  userId: string;
+  username: string;
+  displayName: string | null;
+}
+
+export interface JoinCrewCandidate {
+  groupId: string;
+  status: string;
+  maxMembers: number;
+  joinedCount: number;
+  leader: JoinCrewLeader;
+}
+
+export interface ActiveJoinRequest {
+  requestId: string;
+  groupId: string;
+}
+
+export interface JoinCandidatesResponse {
+  activeJoinRequest: ActiveJoinRequest | null;
+  crews: JoinCrewCandidate[];
+}
+
+export interface GroupOverviewSchool {
+  school: string;
+  count: number;
+}
+
+export interface GroupOverviewKeyword {
+  keyword: string;
+  count: number;
+}
+
+export interface GroupOverviewComment {
+  id: string;
+  userId: string;
+  username: string;
+  displayName: string | null;
+  body: string;
+  createdAt: string;
+}
+
+export interface GroupOverview {
+  memberCount: number;
+  privateMemberCount: number;
+  publicMemberCount: number;
+  averageAge: number | null;
+  dominantSchools: GroupOverviewSchool[];
+  topKeywords: GroupOverviewKeyword[];
+  votes: {
+    upvotes: number;
+    downvotes: number;
+    score: number;
+  };
+  comments: GroupOverviewComment[];
+  generatedAt: string;
+}
+
+export interface CrewDiscoveryCard {
+  groupId: string;
+  maxMembers: number;
+  joinedCount: number;
+  leader: JoinCrewLeader;
+  overview: GroupOverview;
+  outboundStatus: string | null;
+  inboundStatus: string | null;
+}
+
+export interface CrewDiscoveryResponse {
+  sourceGroupId: string;
+  crews: CrewDiscoveryCard[];
 }
 
 const DEFAULT_LIMIT = 20;
@@ -192,6 +267,81 @@ export async function fetchGroupMembers(groupId: string) {
   return apiRequest<GroupMember[]>({
     method: 'GET',
     url: endpoint.groupMembers(groupId),
+  });
+}
+
+export async function fetchGroupJoinCandidates(partyId: string, query: string) {
+  return apiRequest<JoinCandidatesResponse>({
+    method: 'GET',
+    url: endpoint.groupJoinCandidates(partyId),
+    params: {
+      query: query.trim(),
+    },
+  });
+}
+
+export async function withdrawGroupJoinRequest(requestId: string) {
+  return apiRequest<{ withdrawn: true }>({
+    method: 'POST',
+    url: endpoint.withdrawGroupJoinRequest(requestId),
+  });
+}
+
+export async function establishCrew(groupId: string) {
+  return apiRequest<{ established: true; groupId: string; partyId: string; snapshotId: string }>({
+    method: 'POST',
+    url: endpoint.establishGroup(groupId),
+  });
+}
+
+export async function fetchGroupOverview(groupId: string) {
+  return apiRequest<GroupOverview>({
+    method: 'GET',
+    url: endpoint.groupOverview(groupId),
+  });
+}
+
+export async function submitGroupOverviewComment(groupId: string, body: string) {
+  return apiRequest<{ created: true; commentId: string }>({
+    method: 'POST',
+    url: endpoint.groupOverviewComments(groupId),
+    data: {
+      body: body.trim(),
+    },
+  });
+}
+
+export async function submitGroupOverviewVote(groupId: string, vote: 'up' | 'down') {
+  return apiRequest<{ updated: true; vote: number }>({
+    method: 'POST',
+    url: endpoint.groupOverviewVotes(groupId),
+    data: {
+      vote,
+    },
+  });
+}
+
+export async function fetchCrewDiscovery(partyId: string) {
+  return apiRequest<CrewDiscoveryResponse>({
+    method: 'GET',
+    url: endpoint.groupDiscovery(partyId),
+  });
+}
+
+export async function swipeCrewMatch(groupId: string, targetGroupId: string, action: 'like' | 'pass') {
+  return apiRequest<{
+    submitted: true;
+    matched: boolean;
+    status: string;
+    sourceGroupId: string;
+    targetGroupId: string;
+  }>({
+    method: 'POST',
+    url: endpoint.groupMatchRequests(groupId),
+    data: {
+      targetGroupId,
+      action,
+    },
   });
 }
 

@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { fetchThreadMessages, sendThreadMessage } from '../../api/dm.api';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { fetchDmThreads, fetchThreadMessages, sendThreadMessage, updateDmThreadStatus } from '../../api/dm.api';
 import { queryKeys } from '../../api/query-keys';
+import { userProfilePictureUrl } from '../../api/user.api';
 import { AuthPromptCard } from '../../components/AuthPromptCard';
 import { GlassCard } from '../../components/GlassCard';
 import { ProfileMenuButton } from '../../components/ProfileMenuButton';
@@ -22,6 +23,15 @@ type ThreadRoute = RouteProp<RootStackParamList, 'ThreadDetail'>;
 
 const PAGE_SIZE = 25;
 
+function shortId(value: string) {
+  if (value.length <= 10) return value;
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
+function isThreadLocked(status: string) {
+  return status === 'decline' || status === 'close' || status === 'block';
+}
+
 export function ThreadScreen() {
   const queryClient = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -30,6 +40,15 @@ export function ThreadScreen() {
   const [draft, setDraft] = useState('');
 
   const threadId = route.params.threadId;
+
+  const threadMetaQuery = useQuery({
+    queryKey: [...queryKeys.dmThreads(currentUserId), threadId, 'meta'],
+    queryFn: async () => {
+      const page = await fetchDmThreads({ limit: 60 });
+      return page.items.find((thread) => thread.id === threadId) ?? null;
+    },
+    enabled: Boolean(currentUserId),
+  });
 
   const messagesQuery = useInfiniteQuery({
     queryKey: [...queryKeys.dmMessages(threadId, currentUserId), 'infinite'],
@@ -48,10 +67,30 @@ export function ThreadScreen() {
     },
   });
 
+  const updateThreadMutation = useMutation({
+    mutationFn: ({ action }: { action: 'decline' | 'close' }) => updateDmThreadStatus(threadId, action),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dmThreads(currentUserId) });
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.dmThreads(currentUserId), threadId, 'meta'] });
+    },
+  });
+
   const messages = useMemo(() => {
     const all = messagesQuery.data?.pages.flatMap((page) => page.items) ?? [];
     return [...all].reverse();
   }, [messagesQuery.data?.pages]);
+
+  const threadMeta = threadMetaQuery.data;
+  const partnerUserId =
+    route.params.partnerUserId ??
+    (threadMeta
+      ? threadMeta.participant_a === currentUserId
+        ? threadMeta.participant_b
+        : threadMeta.participant_a
+      : null);
+  const resolvedStatus = route.params.threadStatus ?? threadMeta?.status ?? 'pending';
+  const locked = isThreadLocked(resolvedStatus);
+  const mode = route.params.mode ?? 'direct';
 
   if (!currentUserId) {
     return (
@@ -71,9 +110,46 @@ export function ThreadScreen() {
         <Pressable style={styles.iconButton} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={18} color={colors.textPrimary} />
         </Pressable>
-        <Text style={styles.title}>Conversation</Text>
+        <Text style={styles.title}>{mode === 'crew-link' ? 'Crew Chat' : 'Conversation'}</Text>
         <ProfileMenuButton />
       </View>
+
+      <GlassCard style={styles.threadMetaCard}>
+        <View style={styles.memberStrip}>
+          <Image source={{ uri: userProfilePictureUrl(currentUserId) }} style={styles.memberAvatar} />
+          {partnerUserId ? <Image source={{ uri: userProfilePictureUrl(partnerUserId) }} style={styles.memberAvatar} /> : null}
+          <View style={styles.memberTextWrap}>
+            <Text style={styles.memberTitle}>
+              {mode === 'crew-link' ? 'You + Linked Crew' : 'Direct chat'}
+            </Text>
+            <Text style={styles.memberSubtitle}>
+              {partnerUserId ? `Partner ${shortId(partnerUserId)}` : `Thread ${shortId(threadId)}`}
+            </Text>
+          </View>
+          <View style={[styles.statusChip, locked ? styles.statusChipLocked : styles.statusChipLive]}>
+            <Text style={styles.statusChipText}>{resolvedStatus}</Text>
+          </View>
+        </View>
+
+        {route.params.partyId ? <Text style={styles.partyMeta}>Event {shortId(route.params.partyId)}</Text> : null}
+
+        {resolvedStatus === 'pending' ? (
+          <View style={styles.threadActionRow}>
+            <PrimaryButton
+              label="Decline request"
+              variant="ghost"
+              loading={updateThreadMutation.isPending}
+              onPress={() => updateThreadMutation.mutate({ action: 'decline' })}
+            />
+            <PrimaryButton
+              label="Close thread"
+              variant="outline"
+              loading={updateThreadMutation.isPending}
+              onPress={() => updateThreadMutation.mutate({ action: 'close' })}
+            />
+          </View>
+        ) : null}
+      </GlassCard>
 
       {messagesQuery.isLoading ? <StateView loading /> : null}
       {messagesQuery.isError ? <StateView errorMessage={(messagesQuery.error as Error).message} onRetry={messagesQuery.refetch} /> : null}
@@ -102,6 +178,7 @@ export function ThreadScreen() {
       ) : null}
 
       <GlassCard style={styles.composerCard}>
+        {locked ? <Text style={styles.lockedText}>This thread is closed. Re-open from Crew Chat by sending a new request.</Text> : null}
         <TextInput
           value={draft}
           onChangeText={setDraft}
@@ -110,11 +187,12 @@ export function ThreadScreen() {
           style={styles.composerInput}
           placeholder="Write your message..."
           placeholderTextColor="rgba(255,255,255,0.55)"
+          editable={!locked}
         />
         <PrimaryButton
           label="Send"
           loading={sendMutation.isPending}
-          disabled={!draft.trim()}
+          disabled={!draft.trim() || locked}
           onPress={() => sendMutation.mutate(draft.trim())}
         />
       </GlassCard>
@@ -144,6 +222,64 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 13,
     textAlign: 'center',
+  },
+  threadMetaCard: {
+    gap: 8,
+    marginBottom: 10,
+  },
+  memberStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  memberAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  memberTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  memberTitle: {
+    color: colors.textPrimary,
+    fontFamily: fonts.bold,
+    fontSize: 14,
+  },
+  memberSubtitle: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 12,
+  },
+  statusChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+  },
+  statusChipLive: {
+    backgroundColor: 'rgba(53,214,177,0.2)',
+  },
+  statusChipLocked: {
+    backgroundColor: 'rgba(255,98,116,0.18)',
+  },
+  statusChipText: {
+    color: colors.textPrimary,
+    fontFamily: fonts.medium,
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  partyMeta: {
+    color: colors.accentMint,
+    fontFamily: fonts.medium,
+    fontSize: 11,
+  },
+  threadActionRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
   messageList: {
     gap: 8,
@@ -179,6 +315,12 @@ const styles = StyleSheet.create({
   composerCard: {
     gap: 8,
     marginTop: 10,
+  },
+  lockedText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    lineHeight: 18,
   },
   composerInput: {
     minHeight: 88,

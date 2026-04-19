@@ -111,7 +111,7 @@ export function NotificationMenuButton() {
         return;
       }
 
-      navigation.navigate('PartyDetail', { partyId, slug: 'group' });
+      navigation.navigate('GroupDetail', { partyId });
     });
   };
 

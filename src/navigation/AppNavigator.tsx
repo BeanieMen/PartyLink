@@ -4,6 +4,7 @@ import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { HomeScreen } from '../features/home/HomeScreen';
 import { PartyDetailScreen } from '../features/parties/PartyDetailScreen';
+import { GroupDetailScreen } from '../features/groups/GroupDetailScreen';
 import { InboxScreen } from '../features/dm/InboxScreen';
 import { ThreadScreen } from '../features/dm/ThreadScreen';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
@@ -39,7 +40,7 @@ export function AppNavigator() {
         initialRouteName="Home"
         screenOptions={{
           headerShown: false,
-          animation: 'fade',
+          animation: 'slide_from_right',
           contentStyle: { backgroundColor: colors.gradientTop },
         }}
       >
@@ -49,6 +50,9 @@ export function AppNavigator() {
         <Stack.Screen name="AccountEdit" component={AccountEditScreen} />
         <Stack.Screen name="Tickets" component={TicketsScreen} />
         <Stack.Screen name="PartyDetail" component={PartyDetailScreen} />
+        <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
+        <Stack.Screen name="GroupMatch" component={GroupDetailScreen} />
+        <Stack.Screen name="GroupInvites" component={GroupDetailScreen} />
         <Stack.Screen name="ThreadDetail" component={ThreadScreen} />
         <Stack.Screen
           name="AuthGate"

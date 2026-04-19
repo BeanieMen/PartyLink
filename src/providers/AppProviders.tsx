@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/types';
+import { colors } from '../theme/colors';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,7 +40,7 @@ export function AppProviders({ children }: PropsWithChildren) {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.gradientTop }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
       </SafeAreaProvider>
