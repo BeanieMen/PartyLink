@@ -6,8 +6,11 @@ node_modules/
 # Expo
 .expo/
 dist/
+out/
+.next/
 web-build/
 expo-env.d.ts
+.capacitor/
 
 # Native
 .kotlin/
@@ -31,6 +34,7 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
