@@ -6,6 +6,7 @@ import type {
   PartyDetail,
   PartySummary,
 } from '@/types/domain';
+import { Platform } from 'react-native';
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:4000';
 
@@ -99,20 +100,19 @@ export async function uploadImage(userId: string, path: string, fileUri: string)
   const formData = new FormData();
   const filename = fileUri.split('/').pop() || 'profile.jpg';
   const match = /\.(\w+)$/.exec(filename);
-  const type = match ? `image/${match[1]}` : `image/jpeg`;
+  const extension = match?.[1]?.toLowerCase();
+  const type = extension === 'png' || extension === 'webp' ? `image/${extension}` : 'image/jpeg';
 
-  try {
-    // Fetch local file URI to get a real Blob (Standard, robust, bypasses RN FormDataPart bugs)
+  if (Platform.OS === 'web') {
     const localResponse = await fetch(fileUri);
     const blob = await localResponse.blob();
     formData.append('image', blob, filename);
-  } catch {
-    // Fallback if the local URI fetch fails for custom schemes
+  } else {
     formData.append('image', {
       uri: fileUri,
       name: filename,
       type,
-    } as any);
+    } as unknown as Blob);
   }
 
   const response = await fetch(makeUrl(path), {
@@ -141,12 +141,10 @@ export const api = {
   getParty: (userId: string, partyId: string) => requestJson<PartyDetail>({ path: `/v1/parties/${partyId}`, userId }),
   partyBanner: (partyId: string) => assetUrl(`/v1/parties/${partyId}/banner`),
   getMe: (userId: string) => requestJson<MeProfile>({ path: '/v1/users/me', userId }),
-  updateMe: (userId: string, body: { displayName?: string; bio?: string; school?: string }) =>
+  updateMe: (userId: string, body: { username?: string; displayName?: string; bio?: string; school?: string }) =>
     requestJson<{ updated: true }>({ path: '/v1/users/me/profile', method: 'PATCH', body, userId }),
   profilePicture: (userId: string) => assetUrl(`/v1/users/${userId}/profile-picture`),
   uploadProfilePicture: (userId: string, fileUri: string) => uploadImage(userId, '/v1/users/me/profile-picture', fileUri),
-  portraitPicture: (userId: string) => assetUrl(`/v1/users/${userId}/portrait`),
-  uploadPortrait: (userId: string, fileUri: string) => uploadImage(userId, '/v1/users/me/portrait', fileUri),
   getAttending: (userId: string) =>
     requestJson<AttendanceRow[]>({ path: `/v1/users/${userId}/parties-attending`, userId }),
   attendParty: (userId: string, partyId: string) =>

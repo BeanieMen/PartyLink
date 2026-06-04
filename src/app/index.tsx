@@ -19,15 +19,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import * as ImagePicker from 'expo-image-picker';
 import QRCode from 'react-native-qrcode-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
+import Animated, { FadeIn, FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 import {
   ArrowLeft,
   CalendarDays,
   CircleUserRound,
   Home as HomeIcon,
-  Lock,
   MapPin,
   Search,
-  Sparkles,
   Ticket,
   UserRound,
 } from 'lucide-react-native';
@@ -38,7 +38,7 @@ import type { PartySummary, PartyDetail, MeProfile } from '@/types/domain';
 
 type AppView = 'discover' | 'event' | 'tickets' | 'profile' | 'profile-setup';
 type Notice = { tone: 'success' | 'error' | 'info'; message: string };
-type ProfileForm = { displayName: string; bio: string; school: string };
+type ProfileForm = { username: string; displayName: string; bio: string; school: string };
 
 const { width } = Dimensions.get('window');
 const maxMobileWidth = 480;
@@ -55,6 +55,10 @@ const colors = {
   honey: '#ffe69b',
   border: '#f0ded8',
   rose: '#d95d77',
+};
+const fonts = {
+  body: Platform.select({ ios: 'Avenir Next', android: 'sans-serif', default: 'Montserrat, Avenir Next, system-ui' }),
+  heavy: Platform.select({ ios: 'AvenirNext-Heavy', android: 'sans-serif-condensed', default: 'Montserrat, Avenir Next, system-ui' }),
 };
 
 export default function EntryScreen() {
@@ -107,9 +111,10 @@ function AuthScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.authContainer}
     >
-      <View style={styles.authCard}>
+      <Animated.View entering={FadeInDown.duration(650).springify()} style={styles.authCard}>
         <View style={styles.logoWrapper}>
           <Text style={styles.brandTitle}>PARTYLINK</Text>
+          <Text style={styles.brandSubtitle}>Find the night that finds you back.</Text>
         </View>
 
         <View style={styles.authButtonsContainer}>
@@ -123,7 +128,7 @@ function AuthScreen() {
               <ActivityIndicator color="#2e1065" size="small" />
             ) : (
               <View style={styles.authButtonInner}>
-                <Lock size={18} color={colors.ink} />
+                <BrandIcon brand="google" />
                 <Text style={styles.authButtonTextPrimary}>Continue with Google</Text>
               </View>
             )}
@@ -139,14 +144,38 @@ function AuthScreen() {
               <ActivityIndicator color={colors.ink} size="small" />
             ) : (
               <View style={styles.authButtonInner}>
-                <Sparkles size={18} color={colors.ink} />
+                <BrandIcon brand="discord" />
                 <Text style={styles.authButtonTextSecondary}>Continue with Discord</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
-      </View>
+      </Animated.View>
     </LinearGradient>
+  );
+}
+
+function BrandIcon({ brand }: { brand: 'google' | 'discord' }) {
+  if (brand === 'discord') {
+    return (
+      <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M8.7 7.4c2.1-.6 4.4-.6 6.6 0l.4.1 1.1-1.4c2 .6 3.6 1.5 4.7 2.6-.8 5.8-2.4 8.3-4.6 9.1-1.1-.6-2-1.3-2.7-2.2.4-.1.8-.3 1.1-.5-.2-.1-.4-.2-.6-.4-1.8.8-3.7.8-5.4 0-.2.2-.4.3-.6.4.4.2.7.4 1.1.5-.7.9-1.6 1.6-2.7 2.2-2.2-.8-3.8-3.3-4.6-9.1 1.1-1.1 2.7-2 4.7-2.6l1.1 1.4.4-.1Z"
+          fill="#5865F2"
+        />
+        <Circle cx={9.4} cy={12.2} r={1.1} fill="#fff" />
+        <Circle cx={14.6} cy={12.2} r={1.1} fill="#fff" />
+      </Svg>
+    );
+  }
+
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M21.6 12.2c0-.7-.1-1.3-.2-1.9H12v3.6h5.4c-.2 1.2-.9 2.2-1.9 2.9v2.4h3.1c1.8-1.7 3-4.2 3-7Z" fill="#4285F4" />
+      <Path d="M12 22c2.6 0 4.8-.9 6.4-2.4l-3.1-2.4c-.9.6-2 .9-3.3.9-2.5 0-4.7-1.7-5.4-4H3.4v2.5C5 19.8 8.2 22 12 22Z" fill="#34A853" />
+      <Path d="M6.6 14.1c-.2-.6-.3-1.3-.3-2.1s.1-1.4.3-2.1V7.4H3.4A10 10 0 0 0 2.4 12c0 1.6.4 3.2 1.1 4.6l3.1-2.5Z" fill="#FBBC05" />
+      <Path d="M12 5.9c1.4 0 2.7.5 3.7 1.5l2.8-2.8C16.8 3 14.6 2 12 2 8.2 2 5 4.2 3.4 7.4l3.2 2.5c.7-2.3 2.9-4 5.4-4Z" fill="#EA4335" />
+    </Svg>
   );
 }
 
@@ -163,9 +192,8 @@ function TicketingApp() {
   const [selectedPartyId, setSelectedPartyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [search, setSearch] = useState('');
-  const [profileForm, setProfileForm] = useState({ displayName: '', bio: '', school: '' });
+  const [profileForm, setProfileForm] = useState<ProfileForm>({ username: '', displayName: '', bio: '', school: '' });
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
-  const [selectedPortraitUri, setSelectedPortraitUri] = useState<string | null>(null);
 
   const view = history[history.length - 1] ?? 'discover';
 
@@ -207,6 +235,7 @@ function TicketingApp() {
   useEffect(() => {
     if (!meQuery.data || !user) return;
     setProfileForm({
+      username: meQuery.data.username ?? '',
       displayName: meQuery.data.display_name ?? user.fullName ?? user.username ?? '',
       bio: meQuery.data.bio ?? '',
       school: meQuery.data.school ?? '',
@@ -215,7 +244,10 @@ function TicketingApp() {
 
   useEffect(() => {
     if (meQuery.isLoading || !meQuery.data) return;
-    const isProfileIncomplete = !meQuery.data.display_name || !meQuery.data.display_name.trim();
+    const isProfileIncomplete =
+      !meQuery.data.username?.trim() ||
+      !meQuery.data.display_name?.trim() ||
+      !meQuery.data.has_profile_picture;
     if (isProfileIncomplete && view !== 'profile-setup') {
       setHistory(['profile-setup']);
     }
@@ -261,6 +293,7 @@ function TicketingApp() {
   const updateProfileMutation = useMutation({
     mutationFn: () =>
       api.updateMe(userId, {
+        username: profileForm.username.trim(),
         displayName: profileForm.displayName.trim(),
         bio: profileForm.bio.trim(),
         school: profileForm.school.trim(),
@@ -277,15 +310,6 @@ function TicketingApp() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['me', userId] });
       showNotice({ tone: 'success', message: 'Profile photo updated.' });
-    },
-    onError: (error) => showNotice({ tone: 'error', message: errorMessage(error) }),
-  });
-
-  const uploadPortraitMutation = useMutation({
-    mutationFn: (fileUri: string) => api.uploadPortrait(userId, fileUri),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['me', userId] });
-      showNotice({ tone: 'success', message: 'Profile portrait updated.' });
     },
     onError: (error) => showNotice({ tone: 'error', message: errorMessage(error) }),
   });
@@ -309,28 +333,10 @@ function TicketingApp() {
     }
   };
 
-  const handlePickPortrait = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert('Permission Denied', 'Camera roll access is required to upload a profile portrait.');
-      return;
-    }
-
-    const pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.8,
-    });
-
-    if (!pickerResult.canceled && pickerResult.assets?.[0]?.uri) {
-      uploadPortraitMutation.mutate(pickerResult.assets[0].uri);
-    }
-  };
-
   const setupProfileMutation = useMutation({
-    mutationFn: async (form: { displayName: string; bio: string; school: string }) => {
+    mutationFn: async (form: ProfileForm) => {
       await api.updateMe(userId, {
+        username: form.username.trim(),
         displayName: form.displayName.trim(),
         bio: form.bio.trim(),
         school: form.school.trim(),
@@ -338,14 +344,10 @@ function TicketingApp() {
       if (selectedPhotoUri) {
         await api.uploadProfilePicture(userId, selectedPhotoUri);
       }
-      if (selectedPortraitUri) {
-        await api.uploadPortrait(userId, selectedPortraitUri);
-      }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['me', userId] });
       setSelectedPhotoUri(null);
-      setSelectedPortraitUri(null);
       showNotice({ tone: 'success', message: 'Profile completed!' });
       setHistory(['discover']);
     },
@@ -371,29 +373,9 @@ function TicketingApp() {
     }
   };
 
-  const handlePickPortraitForSetup = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert('Permission Denied', 'Camera roll access is required to upload a profile portrait.');
-      return;
-    }
-
-    const pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.8,
-    });
-
-    if (!pickerResult.canceled && pickerResult.assets?.[0]?.uri) {
-      setSelectedPortraitUri(pickerResult.assets[0].uri);
-    }
-  };
-
   const isBusy =
     updateProfileMutation.isPending ||
     uploadProfilePictureMutation.isPending ||
-    uploadPortraitMutation.isPending ||
     setupProfileMutation.isPending;
 
   return (
@@ -415,6 +397,7 @@ function TicketingApp() {
       <ScrollView contentContainerStyle={styles.mainScroll} keyboardShouldPersistTaps="handled">
         {view === 'discover' && (
           <DiscoverScreen
+            me={meQuery.data}
             parties={filteredParties}
             loading={partiesQuery.isLoading}
             error={partiesQuery.error}
@@ -456,7 +439,6 @@ function TicketingApp() {
             onBack={goBack}
             onForm={setProfileForm}
             onProfilePicture={handlePickImage}
-            onPortrait={handlePickPortrait}
             onSave={() => updateProfileMutation.mutate()}
             onSignOut={() => signOut()}
           />
@@ -468,9 +450,7 @@ function TicketingApp() {
             busy={setupProfileMutation.isPending}
             onComplete={(form) => setupProfileMutation.mutate(form)}
             onProfilePicture={handlePickImageForSetup}
-            onPortrait={handlePickPortraitForSetup}
             photoUri={selectedPhotoUri}
-            portraitUri={selectedPortraitUri}
           />
         )}
       </ScrollView>
@@ -486,6 +466,7 @@ function TicketingApp() {
 // DISCOVER VIEW
 // ----------------------------------------------------
 function DiscoverScreen({
+  me,
   parties,
   loading,
   error,
@@ -495,6 +476,7 @@ function DiscoverScreen({
   onOpenParty,
   onOpenProfile,
 }: {
+  me: MeProfile | undefined;
   parties: PartySummary[];
   loading: boolean;
   error: unknown;
@@ -506,17 +488,21 @@ function DiscoverScreen({
 }) {
   return (
     <View style={styles.screenInner}>
-      <View style={styles.discoverHeader}>
+      <Animated.View entering={FadeInDown.duration(450)} style={styles.discoverHeader}>
         <View>
           <Text style={styles.headerBrandTag}>PARTYLINK</Text>
           <Text style={styles.headerTitle}>Little nights out</Text>
         </View>
         <TouchableOpacity style={styles.headerProfileButton} onPress={onOpenProfile}>
-          <CircleUserRound size={22} color="#ffffff" />
+          {me?.has_profile_picture ? (
+            <Image source={{ uri: api.profilePicture(me.id) }} style={styles.headerProfileImage} />
+          ) : (
+            <CircleUserRound size={22} color="#ffffff" />
+          )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
-      <View style={styles.searchBarWrapper}>
+      <Animated.View entering={FadeInDown.delay(80).duration(450)} style={styles.searchBarWrapper}>
         <Search size={19} color={colors.muted} style={styles.searchBarIcon} />
         <TextInput
           style={styles.searchBarInput}
@@ -525,7 +511,7 @@ function DiscoverScreen({
           value={search}
           onChangeText={onSearch}
         />
-      </View>
+      </Animated.View>
 
       <LoadState
         loading={loading}
@@ -535,49 +521,54 @@ function DiscoverScreen({
       />
 
       <View style={styles.cardsGrid}>
-        {parties.map((party) => {
+        {parties.map((party, index) => {
           const hasTicket = ticketedPartyIds.has(party.party_id);
           return (
-            <TouchableOpacity
+            <Animated.View
               key={party.party_id}
-              activeOpacity={0.9}
-              style={styles.eventCard}
-              onPress={() => onOpenParty(party.party_id)}
+              entering={FadeInUp.delay(Math.min(index * 60, 420)).duration(420)}
+              layout={Layout.springify()}
             >
-              <View style={styles.eventCardImageWrapper}>
-                <Image
-                  source={{ uri: api.partyBanner(party.party_id) }}
-                  style={styles.eventCardImage}
-                />
-              </View>
-              <View style={styles.eventCardDetails}>
-                <View style={styles.cardInfoSplit}>
-                  <View style={styles.cardInfoLeft}>
-                    <Text style={styles.cardTitle} numberOfLines={1}>
-                      {party.name}
-                    </Text>
-                    <View style={styles.cardMetaRow}>
-                      <CalendarDays size={15} color="#52525b" />
-                      <Text style={styles.cardMetaText}>
-                        {formatPartyDate(party.party_date, party.party_time)}
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={styles.eventCard}
+                onPress={() => onOpenParty(party.party_id)}
+              >
+                <View style={styles.eventCardImageWrapper}>
+                  <Image
+                    source={{ uri: api.partyBanner(party.party_id) }}
+                    style={styles.eventCardImage}
+                  />
+                </View>
+                <View style={styles.eventCardDetails}>
+                  <View style={styles.cardInfoSplit}>
+                    <View style={styles.cardInfoLeft}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>
+                        {party.name}
                       </Text>
+                      <View style={styles.cardMetaRow}>
+                        <CalendarDays size={15} color={colors.muted} />
+                        <Text style={styles.cardMetaText}>
+                          {formatPartyDate(party.party_date, party.party_time)}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
 
-                <View style={styles.cardInfoSplit}>
-                  <View style={styles.cardLocationRow}>
-                    <MapPin size={15} color="#52525b" />
-                    <Text style={styles.cardLocationText} numberOfLines={1}>
-                      {party.location}
+                  <View style={styles.cardInfoSplit}>
+                    <View style={styles.cardLocationRow}>
+                      <MapPin size={15} color={colors.muted} />
+                      <Text style={styles.cardLocationText} numberOfLines={1}>
+                        {party.location}
+                      </Text>
+                    </View>
+                    <Text style={hasTicket ? styles.statusSavedText : styles.statusLeftText}>
+                      {hasTicket ? 'Saved for you' : 'Open invite'}
                     </Text>
                   </View>
-                  <Text style={hasTicket ? styles.statusSavedText : styles.statusLeftText}>
-                    {hasTicket ? 'Saved for you' : 'Open invite'}
-                  </Text>
                 </View>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </Animated.View>
           );
         })}
       </View>
@@ -613,7 +604,7 @@ function EventScreen({
       <LoadState loading={loading} error={error} empty={!party} emptyLabel="Event not found." />
 
       {party && (
-        <View style={styles.eventDetailCard}>
+        <Animated.View entering={FadeInUp.duration(500)} style={styles.eventDetailCard}>
           <View style={styles.eventDetailImageWrapper}>
             <Image
               source={{ uri: api.partyBanner(party.party_id) }}
@@ -642,17 +633,12 @@ function EventScreen({
             {party.description && (
               <Text style={styles.detailDescription}>{party.description}</Text>
             )}
-            <View style={styles.softNoteBox}>
-              <Sparkles size={18} color={colors.rose} />
-              <Text style={styles.softNoteText}>
-                No checkout, no fuss. Just save your spot and bring your people.
-              </Text>
-            </View>
           </View>
-        </View>
+        </Animated.View>
       )}
 
       {party && (
+        <Animated.View entering={FadeInUp.delay(120).duration(450)}>
         <TouchableOpacity
           style={styles.blackButton}
           activeOpacity={0.9}
@@ -668,6 +654,7 @@ function EventScreen({
             </View>
           )}
         </TouchableOpacity>
+        </Animated.View>
       )}
     </View>
   );
@@ -687,10 +674,10 @@ function TicketsScreen({
 }) {
   return (
     <View style={styles.screenInner}>
-      <View style={styles.ticketsHeader}>
+      <Animated.View entering={FadeInDown.duration(450)} style={styles.ticketsHeader}>
         <Text style={styles.headerBrandTag}>Keepsakes</Text>
         <Text style={styles.headerTitle}>Your passes</Text>
-      </View>
+      </Animated.View>
 
       <LoadState
         loading={loading}
@@ -700,34 +687,35 @@ function TicketsScreen({
       />
 
       <View style={styles.ticketsList}>
-        {tickets.map((ticket) => (
-          <TouchableOpacity
-            key={ticket.party_id}
-            activeOpacity={0.9}
-            style={styles.ticketCard}
-            onPress={() => onOpenParty(ticket.party_id)}
-          >
-            <View style={styles.ticketMainRow}>
-              <View style={styles.ticketQrContainer}>
-                <QRCode value={ticket.ticket_code ?? ticket.party_id} size={80} />
+        {tickets.map((ticket, index) => (
+          <Animated.View key={ticket.party_id} entering={FadeInUp.delay(Math.min(index * 60, 420)).duration(420)} layout={Layout.springify()}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={styles.ticketCard}
+              onPress={() => onOpenParty(ticket.party_id)}
+            >
+              <View style={styles.ticketMainRow}>
+                <View style={styles.ticketQrContainer}>
+                  <QRCode value={ticket.ticket_code ?? ticket.party_id} size={80} />
+                </View>
+                <View style={styles.ticketInfoContainer}>
+                  <Text style={styles.ticketNameText} numberOfLines={1}>
+                    {ticket.name}
+                  </Text>
+                  <Text style={styles.ticketDetailText}>
+                    {formatPartyDate(ticket.party_date, ticket.party_time)}
+                  </Text>
+                  <Text style={styles.ticketDetailText} numberOfLines={1}>
+                    {ticket.location}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.ticketInfoContainer}>
-                <Text style={styles.ticketNameText} numberOfLines={1}>
-                  {ticket.name}
-                </Text>
-                <Text style={styles.ticketDetailText}>
-                  {formatPartyDate(ticket.party_date, ticket.party_time)}
-                </Text>
-                <Text style={styles.ticketDetailText} numberOfLines={1}>
-                  {ticket.location}
-                </Text>
-              </View>
-            </View>
 
-            <View style={styles.ticketCodeBox}>
-              <Text style={styles.ticketCodeText}>{ticket.ticket_code ?? 'Code pending'}</Text>
-            </View>
-          </TouchableOpacity>
+              <View style={styles.ticketCodeBox}>
+                <Text style={styles.ticketCodeText}>{ticket.ticket_code ?? 'Code pending'}</Text>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
         ))}
       </View>
     </View>
@@ -745,7 +733,6 @@ function ProfileScreen({
   onBack,
   onForm,
   onProfilePicture,
-  onPortrait,
   onSave,
   onSignOut,
 }: {
@@ -756,7 +743,6 @@ function ProfileScreen({
   onBack: () => void;
   onForm: (form: ProfileForm) => void;
   onProfilePicture: () => void;
-  onPortrait: () => void;
   onSave: () => void;
   onSignOut: () => void;
 }) {
@@ -764,7 +750,7 @@ function ProfileScreen({
     <View style={styles.screenInner}>
       <ScreenHeader title="Profile" onBack={onBack} />
 
-      <View style={styles.profileBoxCard}>
+      <Animated.View entering={FadeInUp.duration(500)} style={styles.profileBoxCard}>
         <View style={styles.profileAvatarRow}>
           <TouchableOpacity style={styles.avatarPickerButton} onPress={onProfilePicture}>
             {me?.has_profile_picture ? (
@@ -784,12 +770,16 @@ function ProfileScreen({
           </View>
         </View>
 
-        <TouchableOpacity style={styles.secondaryActionButton} activeOpacity={0.9} onPress={onPortrait}>
-          <UserRound size={17} color={colors.ink} />
-          <Text style={styles.secondaryActionText}>
-            {me?.has_portrait ? 'Update portrait' : 'Add profile portrait'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.inputWrapper}>
+          <Text style={styles.inputLabel}>Username</Text>
+          <TextInput
+            style={styles.formInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={form.username}
+            onChangeText={(text) => onForm({ ...form, username: text })}
+          />
+        </View>
 
         <View style={styles.inputWrapper}>
           <Text style={styles.inputLabel}>Display name</Text>
@@ -832,7 +822,7 @@ function ProfileScreen({
             <Text style={styles.blackButtonText}>Save profile</Text>
           )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       <TouchableOpacity
         style={styles.signOutBtn}
@@ -853,26 +843,35 @@ function ProfileSetupScreen({
   busy,
   onComplete,
   onProfilePicture,
-  onPortrait,
   photoUri,
-  portraitUri,
 }: {
   me: MeProfile | undefined;
   busy: boolean;
   onComplete: (form: ProfileForm) => void;
   onProfilePicture: () => void;
-  onPortrait: () => void;
   photoUri: string | null;
-  portraitUri: string | null;
 }) {
-  const { user } = useUser();
-  const [form, setForm] = useState<ProfileForm>({ displayName: '', bio: '', school: '' });
+  const [form, setForm] = useState<ProfileForm>({
+    username: me?.username ?? '',
+    displayName: me?.display_name ?? '',
+    bio: me?.bio ?? '',
+    school: me?.school ?? '',
+  });
 
-  const isFormValid = form.displayName.trim().length > 0;
+  const hasProfilePhoto = Boolean(photoUri || me?.has_profile_picture);
+  const isFormValid = form.username.trim().length >= 3 && form.displayName.trim().length > 0 && hasProfilePhoto;
 
   const handleComplete = () => {
-    if (!isFormValid) {
-      Alert.alert('Required Field', 'Please enter a display name to complete your profile.');
+    if (!form.username.trim() || form.username.trim().length < 3) {
+      Alert.alert('Username needed', 'Pick a username with at least 3 characters.');
+      return;
+    }
+    if (!form.displayName.trim()) {
+      Alert.alert('Display name needed', 'Add the name friends should see.');
+      return;
+    }
+    if (!hasProfilePhoto) {
+      Alert.alert('Photo needed', 'Add a profile photo so people can recognize you.');
       return;
     }
     onComplete(form);
@@ -880,13 +879,12 @@ function ProfileSetupScreen({
 
   return (
     <View style={styles.screenInner}>
-      <View style={styles.setupHeader}>
+      <Animated.View entering={FadeInDown.duration(500)} style={styles.setupHeader}>
         <Text style={styles.setupBrandTag}>PARTYLINK</Text>
         <Text style={styles.setupTitle}>Setup your profile</Text>
-        <Text style={styles.setupSubtitle}>Please complete your profile to continue to the application.</Text>
-      </View>
+      </Animated.View>
 
-      <View style={styles.profileBoxCard}>
+      <Animated.View entering={FadeInUp.delay(100).duration(500)} style={styles.profileBoxCard}>
         <View style={styles.profileAvatarRow}>
           <TouchableOpacity style={styles.avatarPickerButton} onPress={onProfilePicture}>
             {photoUri ? (
@@ -904,25 +902,22 @@ function ProfileSetupScreen({
             <Text style={styles.avatarNameText} numberOfLines={1}>
               {form.displayName.trim() || 'New User'}
             </Text>
-            <Text style={styles.avatarSubText}>
-              @{user?.username || user?.primaryEmailAddress?.emailAddress.split('@')[0]}
-            </Text>
+            <Text style={styles.avatarSubText}>{form.username.trim() ? `@${form.username.trim()}` : 'Pick your party handle'}</Text>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.secondaryActionButton} activeOpacity={0.9} onPress={onPortrait}>
-          <UserRound size={17} color={colors.ink} />
-          <Text style={styles.secondaryActionText}>
-            {portraitUri || me?.has_portrait ? 'Portrait selected' : 'Add profile portrait'}
-          </Text>
-        </TouchableOpacity>
-
         <View style={styles.inputWrapper}>
-          <Text style={styles.inputLabel}>Username</Text>
+          <Text style={styles.inputLabel}>
+            Username <Text style={{ color: colors.rose }}>*</Text>
+          </Text>
           <TextInput
-            style={[styles.formInput, styles.disabledInput]}
-            value={user?.username || user?.primaryEmailAddress?.emailAddress.split('@')[0]}
-            editable={false}
+            style={styles.formInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="your_handle"
+            placeholderTextColor={colors.muted}
+            value={form.username}
+            onChangeText={(text) => setForm({ ...form, username: text })}
           />
         </View>
 
@@ -975,7 +970,7 @@ function ProfileSetupScreen({
             <Text style={styles.blackButtonText}>Complete Setup</Text>
           )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -1003,7 +998,7 @@ function BottomNav({ active, onNavigate }: { active: AppView; onNavigate: (view:
   ];
 
   return (
-    <View style={styles.bottomNavContainer}>
+    <Animated.View entering={FadeIn.duration(450)} style={styles.bottomNavContainer}>
       <View style={styles.bottomNavGrid}>
         {items.map((item) => {
           const Icon = item.icon;
@@ -1023,7 +1018,7 @@ function BottomNav({ active, onNavigate }: { active: AppView; onNavigate: (view:
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -1097,8 +1092,17 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 56,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     color: colors.ink,
     letterSpacing: 0,
+  },
+  brandSubtitle: {
+    color: colors.ink,
+    fontFamily: fonts.heavy,
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginTop: 8,
   },
   authButtonsContainer: {
     width: '100%',
@@ -1133,11 +1137,13 @@ const styles = StyleSheet.create({
   authButtonTextPrimary: {
     color: colors.ink,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     fontSize: 16,
   },
   authButtonTextSecondary: {
     color: colors.ink,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     fontSize: 16,
   },
 
@@ -1180,6 +1186,7 @@ const styles = StyleSheet.create({
   noticeText: {
     color: '#ffffff',
     fontWeight: '700',
+    fontFamily: fonts.heavy,
     fontSize: 14,
   },
 
@@ -1193,6 +1200,7 @@ const styles = StyleSheet.create({
   headerBrandTag: {
     fontSize: 12,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     textTransform: 'uppercase',
     letterSpacing: 2,
     color: colors.rose,
@@ -1200,6 +1208,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 30,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     color: colors.ink,
     letterSpacing: 0,
   },
@@ -1210,6 +1219,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.rose,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  headerProfileImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   searchBarWrapper: {
     flexDirection: 'row',
@@ -1228,6 +1243,7 @@ const styles = StyleSheet.create({
   searchBarInput: {
     flex: 1,
     fontSize: 15,
+    fontFamily: fonts.body,
     color: colors.ink,
   },
   cardsGrid: {
@@ -1274,6 +1290,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 20,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     color: colors.ink,
   },
   cardMetaRow: {
@@ -1284,6 +1301,7 @@ const styles = StyleSheet.create({
   },
   cardMetaText: {
     fontSize: 14,
+    fontFamily: fonts.body,
     color: colors.muted,
   },
   cardLocationRow: {
@@ -1294,16 +1312,19 @@ const styles = StyleSheet.create({
   },
   cardLocationText: {
     fontSize: 14,
+    fontFamily: fonts.body,
     color: colors.muted,
   },
   statusSavedText: {
     fontSize: 14,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     color: '#438b72',
   },
   statusLeftText: {
     fontSize: 14,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     color: colors.rose,
   },
 
@@ -1327,6 +1348,7 @@ const styles = StyleSheet.create({
   screenHeaderTitle: {
     fontSize: 18,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     color: colors.ink,
   },
   eventDetailCard: {
@@ -1355,6 +1377,7 @@ const styles = StyleSheet.create({
   liveEventTag: {
     fontSize: 12,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     textTransform: 'uppercase',
     color: colors.rose,
     letterSpacing: 2,
@@ -1362,6 +1385,7 @@ const styles = StyleSheet.create({
   detailName: {
     fontSize: 30,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     color: colors.ink,
   },
   detailMetaRow: {
@@ -1371,6 +1395,7 @@ const styles = StyleSheet.create({
   },
   detailMetaText: {
     fontSize: 14,
+    fontFamily: fonts.body,
     color: colors.ink,
     flex: 1,
     lineHeight: 20,
@@ -1378,24 +1403,8 @@ const styles = StyleSheet.create({
   detailDescription: {
     fontSize: 14,
     lineHeight: 24,
+    fontFamily: fonts.body,
     color: colors.muted,
-  },
-  softNoteBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#fff0e8',
-    borderRadius: 18,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#ffd5c7',
-  },
-  softNoteText: {
-    flex: 1,
-    color: colors.ink,
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '700',
   },
   setupHeader: {
     marginBottom: 24,
@@ -1404,6 +1413,7 @@ const styles = StyleSheet.create({
   setupBrandTag: {
     fontSize: 12,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     textTransform: 'uppercase',
     letterSpacing: 2,
     color: colors.rose,
@@ -1412,20 +1422,10 @@ const styles = StyleSheet.create({
   setupTitle: {
     fontSize: 28,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     color: colors.ink,
     letterSpacing: 0,
     marginBottom: 8,
-  },
-  setupSubtitle: {
-    fontSize: 14,
-    color: colors.muted,
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 16,
-  },
-  disabledInput: {
-    backgroundColor: '#fff2ea',
-    color: colors.muted,
   },
   avatarPlaceholder: {
     alignItems: 'center',
@@ -1436,6 +1436,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.muted,
     fontWeight: '700',
+    fontFamily: fonts.heavy,
   },
   blackButton: {
     height: 56,
@@ -1457,6 +1458,7 @@ const styles = StyleSheet.create({
   blackButtonText: {
     color: colors.ink,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     fontSize: 16,
   },
   // Tickets Wallet styling
@@ -1495,10 +1497,12 @@ const styles = StyleSheet.create({
   ticketNameText: {
     fontSize: 20,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     color: colors.ink,
   },
   ticketDetailText: {
     fontSize: 14,
+    fontFamily: fonts.body,
     color: colors.muted,
     marginTop: 4,
   },
@@ -1549,10 +1553,12 @@ const styles = StyleSheet.create({
   avatarNameText: {
     fontSize: 24,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
     color: colors.ink,
   },
   avatarSubText: {
     fontSize: 14,
+    fontFamily: fonts.body,
     color: colors.muted,
     marginTop: 4,
   },
@@ -1572,6 +1578,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 14,
     fontWeight: '800',
+    fontFamily: fonts.heavy,
   },
   inputWrapper: {
     gap: 8,
@@ -1579,6 +1586,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '700',
+    fontFamily: fonts.heavy,
     color: colors.ink,
   },
   formInput: {
@@ -1589,6 +1597,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     paddingHorizontal: 12,
     fontSize: 15,
+    fontFamily: fonts.body,
     color: colors.ink,
   },
   textAreaInput: {
@@ -1610,6 +1619,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 14,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
   },
 
   // Bottom Nav Bar styling
@@ -1646,6 +1656,7 @@ const styles = StyleSheet.create({
   navLabel: {
     fontSize: 12,
     fontWeight: '900',
+    fontFamily: fonts.heavy,
   },
   navLabelSelected: {
     color: '#ffffff',
@@ -1670,6 +1681,7 @@ const styles = StyleSheet.create({
   loaderStateText: {
     fontSize: 14,
     fontWeight: '700',
+    fontFamily: fonts.heavy,
     color: colors.muted,
   },
   errorStateCard: {
@@ -1683,6 +1695,7 @@ const styles = StyleSheet.create({
   errorStateText: {
     fontSize: 14,
     fontWeight: '700',
+    fontFamily: fonts.heavy,
     color: '#be123c',
   },
 });
