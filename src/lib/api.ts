@@ -7,7 +7,7 @@ import type {
   PartySummary,
 } from '@/types/domain';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:4000';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:4000';
 
 type RequestOptions = {
   path: string;
@@ -32,17 +32,24 @@ export class ApiError extends Error {
 }
 
 function makeUrl(path: string, query?: RequestOptions['query']) {
-  const url = new URL(path, API_BASE_URL);
-  Object.entries(query ?? {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, String(value));
+  let url = `${API_BASE_URL}${path}`;
+  if (query) {
+    const params = new URLSearchParams();
+    Object.entries(query).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value));
+      }
+    });
+    const queryString = params.toString();
+    if (queryString) {
+      url += `?${queryString}`;
     }
-  });
-  return url.toString();
+  }
+  return url;
 }
 
 export function assetUrl(path: string) {
-  return makeUrl(path);
+  return `${API_BASE_URL}${path}`;
 }
 
 export async function requestJson<T>({ path, method = 'GET', query, body, userId }: RequestOptions): Promise<T> {
@@ -55,13 +62,14 @@ export async function requestJson<T>({ path, method = 'GET', query, body, userId
 
   let response: Response;
   try {
-    response = await fetch(makeUrl(path, query), {
+    const fullUrl = makeUrl(path, query);
+    response = await fetch(fullUrl, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch (error) {
-    throw new ApiError(error instanceof Error ? error.message : 'Unable to reach the PartyLink backend', 'NETWORK_ERROR');
+    throw new ApiError(error instanceof Error ? error.message : 'Unable to reach the PARTYLINK backend', 'NETWORK_ERROR');
   }
 
   const text = await response.text();
@@ -87,9 +95,25 @@ export async function requestJson<T>({ path, method = 'GET', query, body, userId
   return payload as T;
 }
 
-export async function uploadImage(userId: string, path: string, file: File) {
+export async function uploadImage(userId: string, path: string, fileUri: string) {
   const formData = new FormData();
-  formData.append('image', file);
+  const filename = fileUri.split('/').pop() || 'profile.jpg';
+  const match = /\.(\w+)$/.exec(filename);
+  const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+  try {
+    // Fetch local file URI to get a real Blob (Standard, robust, bypasses RN FormDataPart bugs)
+    const localResponse = await fetch(fileUri);
+    const blob = await localResponse.blob();
+    formData.append('image', blob, filename);
+  } catch {
+    // Fallback if the local URI fetch fails for custom schemes
+    formData.append('image', {
+      uri: fileUri,
+      name: filename,
+      type,
+    } as any);
+  }
 
   const response = await fetch(makeUrl(path), {
     method: 'POST',
@@ -100,10 +124,12 @@ export async function uploadImage(userId: string, path: string, file: File) {
     body: formData,
   });
 
-  const payload = (await response.json()) as ApiEnvelope<{ updated: true }>;
-  if (!response.ok || !payload.success) {
-    const message = payload.success ? `Upload failed with ${response.status}` : payload.error.message;
-    const code = payload.success ? 'UPLOAD_ERROR' : payload.error.code;
+  const text = await response.text();
+  const payload = text ? (JSON.parse(text) as ApiEnvelope<{ updated: true }>) : null;
+
+  if (!response.ok || !payload || !payload.success) {
+    const message = payload && !payload.success ? payload.error.message : `Upload failed with ${response.status}`;
+    const code = payload && !payload.success ? payload.error.code : 'UPLOAD_ERROR';
     throw new ApiError(message, code, response.status);
   }
 
@@ -118,7 +144,9 @@ export const api = {
   updateMe: (userId: string, body: { displayName?: string; bio?: string; school?: string }) =>
     requestJson<{ updated: true }>({ path: '/v1/users/me/profile', method: 'PATCH', body, userId }),
   profilePicture: (userId: string) => assetUrl(`/v1/users/${userId}/profile-picture`),
-  uploadProfilePicture: (userId: string, file: File) => uploadImage(userId, '/v1/users/me/profile-picture', file),
+  uploadProfilePicture: (userId: string, fileUri: string) => uploadImage(userId, '/v1/users/me/profile-picture', fileUri),
+  portraitPicture: (userId: string) => assetUrl(`/v1/users/${userId}/portrait`),
+  uploadPortrait: (userId: string, fileUri: string) => uploadImage(userId, '/v1/users/me/portrait', fileUri),
   getAttending: (userId: string) =>
     requestJson<AttendanceRow[]>({ path: `/v1/users/${userId}/parties-attending`, userId }),
   attendParty: (userId: string, partyId: string) =>

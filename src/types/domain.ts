@@ -61,6 +61,8 @@ export type MeProfile = {
   bio: string | null;
   school: string | null;
   has_profile_picture?: boolean;
+  has_portrait?: boolean;
+  profile_complete?: boolean;
 };
 
 export type AttendanceRow = PartySummary;
