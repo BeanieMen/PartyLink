@@ -115,22 +115,25 @@ export async function uploadImage(userId: string, path: string, fileUri: string)
     } as unknown as Blob);
   }
 
-  const response = await fetch(makeUrl(path), {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'x-user-id': userId,
-    },
-    body: formData,
+  const { status, text } = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+
+    request.onload = () => resolve({ status: request.status, text: request.responseText });
+    request.onerror = () => reject(new ApiError('Unable to upload image', 'NETWORK_ERROR'));
+    request.ontimeout = () => reject(new ApiError('Image upload timed out', 'NETWORK_ERROR'));
+
+    request.open('POST', makeUrl(path));
+    request.setRequestHeader('Accept', 'application/json');
+    request.setRequestHeader('x-user-id', userId);
+    request.send(formData);
   });
 
-  const text = await response.text();
   const payload = text ? (JSON.parse(text) as ApiEnvelope<{ updated: true }>) : null;
 
-  if (!response.ok || !payload || !payload.success) {
-    const message = payload && !payload.success ? payload.error.message : `Upload failed with ${response.status}`;
+  if (status < 200 || status >= 300 || !payload || !payload.success) {
+    const message = payload && !payload.success ? payload.error.message : `Upload failed with ${status}`;
     const code = payload && !payload.success ? payload.error.code : 'UPLOAD_ERROR';
-    throw new ApiError(message, code, response.status);
+    throw new ApiError(message, code, status);
   }
 
   return payload.data;

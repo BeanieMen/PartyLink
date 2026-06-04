@@ -851,8 +851,19 @@ function ProfileSetupScreen({
   onProfilePicture: () => void;
   photoUri: string | null;
 }) {
+  const isDefaultUsername = (uname: string | undefined, uid: string | undefined) => {
+    if (!uname) return true;
+    if (!uid) return false;
+    const normalizedId = uid
+      .replace(/[^a-zA-Z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 32) || 'user';
+    return uname === normalizedId || uname === uid || uname.startsWith('user_');
+  };
+
   const [form, setForm] = useState<ProfileForm>({
-    username: me?.username ?? '',
+    username: me?.username && !isDefaultUsername(me.username, me.id) ? me.username : '',
     displayName: me?.display_name ?? '',
     bio: me?.bio ?? '',
     school: me?.school ?? '',
