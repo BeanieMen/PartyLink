@@ -25,7 +25,7 @@ export function compactId(value: string, size = 6) {
 }
 
 export function displayName(profile?: { display_name?: string | null; username?: string | null } | null) {
-  return profile?.display_name?.trim() || profile?.username?.trim() || 'PartyLink user';
+  return profile?.display_name?.trim() || profile?.username?.trim() || 'PARTYLINK user';
 }
 
 export function isPrivateFlag(value: number | boolean | null | undefined) {
