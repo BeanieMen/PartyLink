@@ -33,7 +33,7 @@ import {
 } from 'lucide-react-native';
 
 import { api, errorMessage } from '@/lib/api';
-import { formatMoney, formatPartyDate, displayName } from '@/lib/format';
+import { formatPartyDate, displayName } from '@/lib/format';
 import type { PartySummary, PartyDetail, MeProfile } from '@/types/domain';
 
 type AppView = 'discover' | 'event' | 'tickets' | 'profile' | 'profile-setup';
@@ -43,6 +43,19 @@ type ProfileForm = { displayName: string; bio: string; school: string };
 const { width } = Dimensions.get('window');
 const maxMobileWidth = 480;
 const containerWidth = width > maxMobileWidth ? maxMobileWidth : width;
+const colors = {
+  ink: '#3b2f38',
+  muted: '#7f6f78',
+  cream: '#fff8f0',
+  card: '#fffdf8',
+  blush: '#ffd9dc',
+  peach: '#ffb8a3',
+  lavender: '#b9a7ff',
+  mint: '#9ddfc8',
+  honey: '#ffe69b',
+  border: '#f0ded8',
+  rose: '#d95d77',
+};
 
 export default function EntryScreen() {
   const { isSignedIn, isLoaded } = useUser();
@@ -89,7 +102,7 @@ function AuthScreen() {
 
   return (
     <LinearGradient
-      colors={['#2e1065', '#4c1d95', '#2e1065']}
+      colors={['#ffd9dc', '#ffe69b', '#b9a7ff']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.authContainer}
@@ -110,7 +123,7 @@ function AuthScreen() {
               <ActivityIndicator color="#2e1065" size="small" />
             ) : (
               <View style={styles.authButtonInner}>
-                <Lock size={18} color="#2e1065" />
+                <Lock size={18} color={colors.ink} />
                 <Text style={styles.authButtonTextPrimary}>Continue with Google</Text>
               </View>
             )}
@@ -123,10 +136,10 @@ function AuthScreen() {
             onPress={() => handleOAuth('oauth_discord')}
           >
             {loading === 'oauth_discord' ? (
-              <ActivityIndicator color="#ffffff" size="small" />
+              <ActivityIndicator color={colors.ink} size="small" />
             ) : (
               <View style={styles.authButtonInner}>
-                <Sparkles size={18} color="#ffffff" />
+                <Sparkles size={18} color={colors.ink} />
                 <Text style={styles.authButtonTextSecondary}>Continue with Discord</Text>
               </View>
             )}
@@ -239,7 +252,7 @@ function TicketingApp() {
         queryClient.invalidateQueries({ queryKey: ['party', selectedPartyId, userId] }),
         queryClient.invalidateQueries({ queryKey: ['tickets', userId] }),
       ]);
-      showNotice({ tone: 'success', message: result.alreadyAttending ? 'Ticket already saved.' : 'Ticket saved.' });
+      showNotice({ tone: 'success', message: result.alreadyAttending ? 'You are already on the list.' : 'You are on the list.' });
       navigate('tickets', { replace: true });
     },
     onError: (error) => showNotice({ tone: 'error', message: errorMessage(error) }),
@@ -496,7 +509,7 @@ function DiscoverScreen({
       <View style={styles.discoverHeader}>
         <View>
           <Text style={styles.headerBrandTag}>PARTYLINK</Text>
-          <Text style={styles.headerTitle}>Upcoming events</Text>
+          <Text style={styles.headerTitle}>Little nights out</Text>
         </View>
         <TouchableOpacity style={styles.headerProfileButton} onPress={onOpenProfile}>
           <CircleUserRound size={22} color="#ffffff" />
@@ -504,11 +517,11 @@ function DiscoverScreen({
       </View>
 
       <View style={styles.searchBarWrapper}>
-        <Search size={19} color="#71717a" style={styles.searchBarIcon} />
+        <Search size={19} color={colors.muted} style={styles.searchBarIcon} />
         <TextInput
           style={styles.searchBarInput}
-          placeholder="Search by artist, venue, or city"
-          placeholderTextColor="#71717a"
+          placeholder="Find a vibe, venue, or friend-night"
+          placeholderTextColor={colors.muted}
           value={search}
           onChangeText={onSearch}
         />
@@ -518,7 +531,7 @@ function DiscoverScreen({
         loading={loading}
         error={error}
         empty={!parties.length}
-        emptyLabel="No events match your search."
+        emptyLabel="No cozy matches yet."
       />
 
       <View style={styles.cardsGrid}>
@@ -536,9 +549,6 @@ function DiscoverScreen({
                   source={{ uri: api.partyBanner(party.party_id) }}
                   style={styles.eventCardImage}
                 />
-                <View style={styles.priceOverlay}>
-                  <Text style={styles.priceOverlayText}>{formatMoney(party.price)}</Text>
-                </View>
               </View>
               <View style={styles.eventCardDetails}>
                 <View style={styles.cardInfoSplit}>
@@ -553,9 +563,6 @@ function DiscoverScreen({
                       </Text>
                     </View>
                   </View>
-                  <View style={styles.cardPriceBox}>
-                    <Text style={styles.cardPriceText}>{formatMoney(party.price)}</Text>
-                  </View>
                 </View>
 
                 <View style={styles.cardInfoSplit}>
@@ -566,7 +573,7 @@ function DiscoverScreen({
                     </Text>
                   </View>
                   <Text style={hasTicket ? styles.statusSavedText : styles.statusLeftText}>
-                    {hasTicket ? 'Ticket saved' : `${party.tickets_left} left`}
+                    {hasTicket ? 'Saved for you' : 'Open invite'}
                   </Text>
                 </View>
               </View>
@@ -612,24 +619,21 @@ function EventScreen({
               source={{ uri: api.partyBanner(party.party_id) }}
               style={styles.eventDetailImage}
             />
-            <View style={styles.priceOverlay}>
-              <Text style={styles.priceOverlayText}>{formatMoney(party.price)}</Text>
-            </View>
           </View>
 
           <View style={styles.eventDetailInfo}>
-            <Text style={styles.liveEventTag}>Live event</Text>
+            <Text style={styles.liveEventTag}>Tonight feels like</Text>
             <Text style={styles.detailName}>{party.name}</Text>
 
             <View style={styles.detailMetaRow}>
-              <CalendarDays size={18} color="#09090b" />
+              <CalendarDays size={18} color={colors.rose} />
               <Text style={styles.detailMetaText}>
                 {formatPartyDate(party.party_date, party.party_time)}
               </Text>
             </View>
 
             <View style={styles.detailMetaRow}>
-              <MapPin size={18} color="#09090b" />
+              <MapPin size={18} color={colors.rose} />
               <Text style={styles.detailMetaText}>
                 {party.location_meta?.address ?? party.location}
               </Text>
@@ -638,16 +642,11 @@ function EventScreen({
             {party.description && (
               <Text style={styles.detailDescription}>{party.description}</Text>
             )}
-
-            <View style={styles.statsGrid}>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Price</Text>
-                <Text style={styles.statValue}>{formatMoney(party.price)}</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Tickets left</Text>
-                <Text style={styles.statValue}>{party.tickets_left}</Text>
-              </View>
+            <View style={styles.softNoteBox}>
+              <Sparkles size={18} color={colors.rose} />
+              <Text style={styles.softNoteText}>
+                No checkout, no fuss. Just save your spot and bring your people.
+              </Text>
             </View>
           </View>
         </View>
@@ -661,11 +660,11 @@ function EventScreen({
           onPress={hasTicket ? onTickets : onAttend}
         >
           {busy ? (
-            <ActivityIndicator color="#ffffff" size="small" />
+            <ActivityIndicator color={colors.ink} size="small" />
           ) : (
             <View style={styles.buttonIconLabel}>
-              <Ticket size={19} color="#ffffff" />
-              <Text style={styles.blackButtonText}>{hasTicket ? 'View ticket' : 'Get free ticket'}</Text>
+              <Ticket size={19} color={colors.ink} />
+              <Text style={styles.blackButtonText}>{hasTicket ? 'View pass' : 'Save my spot'}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -689,15 +688,15 @@ function TicketsScreen({
   return (
     <View style={styles.screenInner}>
       <View style={styles.ticketsHeader}>
-        <Text style={styles.headerBrandTag}>Wallet</Text>
-        <Text style={styles.headerTitle}>Your tickets</Text>
+        <Text style={styles.headerBrandTag}>Keepsakes</Text>
+        <Text style={styles.headerTitle}>Your passes</Text>
       </View>
 
       <LoadState
         loading={loading}
         error={null}
         empty={!tickets.length}
-        emptyLabel="No tickets yet. Find an event to get started."
+        emptyLabel="No passes yet. Pick a night that feels like you."
       />
 
       <View style={styles.ticketsList}>
@@ -774,7 +773,7 @@ function ProfileScreen({
                 style={styles.avatarImage}
               />
             ) : (
-              <UserRound size={30} color="#71717a" />
+              <UserRound size={30} color={colors.muted} />
             )}
           </TouchableOpacity>
           <View style={styles.avatarDetails}>
@@ -786,7 +785,7 @@ function ProfileScreen({
         </View>
 
         <TouchableOpacity style={styles.secondaryActionButton} activeOpacity={0.9} onPress={onPortrait}>
-          <UserRound size={17} color="#09090b" />
+          <UserRound size={17} color={colors.ink} />
           <Text style={styles.secondaryActionText}>
             {me?.has_portrait ? 'Update portrait' : 'Add profile portrait'}
           </Text>
@@ -828,7 +827,7 @@ function ProfileScreen({
           onPress={onSave}
         >
           {busy ? (
-            <ActivityIndicator color="#ffffff" size="small" />
+            <ActivityIndicator color={colors.ink} size="small" />
           ) : (
             <Text style={styles.blackButtonText}>Save profile</Text>
           )}
@@ -896,7 +895,7 @@ function ProfileSetupScreen({
               <Image source={{ uri: api.profilePicture(me.id) }} style={styles.avatarImage} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <UserRound size={30} color="#71717a" />
+                <UserRound size={30} color={colors.muted} />
                 <Text style={styles.avatarPlaceholderText}>Add Photo</Text>
               </View>
             )}
@@ -912,7 +911,7 @@ function ProfileSetupScreen({
         </View>
 
         <TouchableOpacity style={styles.secondaryActionButton} activeOpacity={0.9} onPress={onPortrait}>
-          <UserRound size={17} color="#09090b" />
+          <UserRound size={17} color={colors.ink} />
           <Text style={styles.secondaryActionText}>
             {portraitUri || me?.has_portrait ? 'Portrait selected' : 'Add profile portrait'}
           </Text>
@@ -929,12 +928,12 @@ function ProfileSetupScreen({
 
         <View style={styles.inputWrapper}>
           <Text style={styles.inputLabel}>
-            Display name <Text style={{ color: '#e11d48' }}>*</Text>
+            Display name <Text style={{ color: colors.rose }}>*</Text>
           </Text>
           <TextInput
             style={styles.formInput}
             placeholder="Your name"
-            placeholderTextColor="#71717a"
+            placeholderTextColor={colors.muted}
             value={form.displayName}
             onChangeText={(text) => setForm({ ...form, displayName: text })}
           />
@@ -947,7 +946,7 @@ function ProfileSetupScreen({
             multiline
             numberOfLines={4}
             placeholder="Tell us about yourself..."
-            placeholderTextColor="#71717a"
+            placeholderTextColor={colors.muted}
             value={form.bio}
             onChangeText={(text) => setForm({ ...form, bio: text })}
           />
@@ -958,7 +957,7 @@ function ProfileSetupScreen({
           <TextInput
             style={styles.formInput}
             placeholder="e.g. UCLA, Los Angeles"
-            placeholderTextColor="#71717a"
+            placeholderTextColor={colors.muted}
             value={form.school}
             onChangeText={(text) => setForm({ ...form, school: text })}
           />
@@ -971,7 +970,7 @@ function ProfileSetupScreen({
           onPress={handleComplete}
         >
           {busy ? (
-            <ActivityIndicator color="#ffffff" size="small" />
+            <ActivityIndicator color={colors.ink} size="small" />
           ) : (
             <Text style={styles.blackButtonText}>Complete Setup</Text>
           )}
@@ -988,7 +987,7 @@ function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) 
   return (
     <View style={styles.screenHeader}>
       <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-        <ArrowLeft size={20} color="#09090b" />
+        <ArrowLeft size={20} color={colors.ink} />
       </TouchableOpacity>
       <Text style={styles.screenHeaderTitle}>{title}</Text>
       <View style={{ width: 44 }} />
@@ -1016,7 +1015,7 @@ function BottomNav({ active, onNavigate }: { active: AppView; onNavigate: (view:
               style={[styles.navBtn, selected ? styles.navBtnSelected : styles.navBtnUnselected]}
               onPress={() => onNavigate(item.view)}
             >
-              <Icon size={20} color={selected ? '#ffffff' : '#71717a'} />
+              <Icon size={20} color={selected ? '#ffffff' : colors.muted} />
               <Text style={[styles.navLabel, selected ? styles.navLabelSelected : styles.navLabelUnselected]}>
                 {item.label}
               </Text>
@@ -1042,7 +1041,7 @@ function LoadState({
   if (loading) {
     return (
       <View style={styles.loaderStateCard}>
-        <ActivityIndicator color="#71717a" size="small" />
+        <ActivityIndicator color={colors.muted} size="small" />
         <Text style={styles.loaderStateText}>Loading</Text>
       </View>
     );
@@ -1073,12 +1072,12 @@ function LoadState({
 const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: colors.cream,
     alignItems: 'center',
     justifyContent: 'center',
   },
   loadingScreen: {
-    backgroundColor: '#0a0a0a',
+    backgroundColor: colors.cream,
   },
   authContainer: {
     width: '100%',
@@ -1096,35 +1095,35 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   brandTitle: {
-    fontSize: 60,
+    fontSize: 56,
     fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: -3,
+    color: colors.ink,
+    letterSpacing: 0,
   },
   authButtonsContainer: {
     width: '100%',
     gap: 12,
   },
   authButtonPrimary: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     height: 56,
-    borderRadius: 8,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowColor: colors.rose,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
     elevation: 3,
   },
   authButtonSecondary: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 253, 248, 0.55)',
     height: 56,
-    borderRadius: 8,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(59, 47, 56, 0.12)',
   },
   authButtonInner: {
     flexDirection: 'row',
@@ -1132,12 +1131,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   authButtonTextPrimary: {
-    color: '#2e1065',
+    color: colors.ink,
     fontWeight: '900',
     fontSize: 16,
   },
   authButtonTextSecondary: {
-    color: '#ffffff',
+    color: colors.ink,
     fontWeight: '900',
     fontSize: 16,
   },
@@ -1146,7 +1145,7 @@ const styles = StyleSheet.create({
   appContainer: {
     flex: 1,
     width: containerWidth,
-    backgroundColor: '#f5f5f4', // bg-stone-50
+    backgroundColor: colors.cream,
   },
   mainScroll: {
     paddingBottom: 120,
@@ -1162,21 +1161,21 @@ const styles = StyleSheet.create({
     left: '5%',
     width: '90%',
     zIndex: 100,
-    backgroundColor: '#09090b',
-    borderRadius: 8,
+    backgroundColor: colors.ink,
+    borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    shadowColor: '#000',
+    shadowColor: colors.rose,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 5,
   },
   noticeError: {
-    backgroundColor: '#e11d48',
+    backgroundColor: colors.rose,
   },
   noticeSuccess: {
-    backgroundColor: '#047857',
+    backgroundColor: '#63b99f',
   },
   noticeText: {
     color: '#ffffff',
@@ -1196,19 +1195,19 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 2,
-    color: '#e11d48', // text-rose-600
+    color: colors.rose,
   },
   headerTitle: {
     fontSize: 30,
     fontWeight: '900',
-    color: '#09090b',
-    letterSpacing: -0.5,
+    color: colors.ink,
+    letterSpacing: 0,
   },
   headerProfileButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: '#09090b',
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    backgroundColor: colors.rose,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1217,9 +1216,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 48,
     borderWidth: 1,
-    borderColor: '#e4e4e7',
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
+    borderColor: colors.border,
+    borderRadius: 18,
+    backgroundColor: colors.card,
     paddingHorizontal: 12,
     marginBottom: 20,
   },
@@ -1229,7 +1228,7 @@ const styles = StyleSheet.create({
   searchBarInput: {
     flex: 1,
     fontSize: 15,
-    color: '#09090b',
+    color: colors.ink,
   },
   cardsGrid: {
     gap: 12,
@@ -1237,41 +1236,27 @@ const styles = StyleSheet.create({
 
   // EventCard styling
   eventCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
+    backgroundColor: colors.card,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#e4e4e7',
+    borderColor: colors.border,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowColor: colors.rose,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.11,
+    shadowRadius: 18,
     elevation: 2,
   },
   eventCardImageWrapper: {
     width: '100%',
     aspectRatio: 16 / 9,
-    backgroundColor: '#e4e4e7',
+    backgroundColor: colors.blush,
     position: 'relative',
   },
   eventCardImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
-  },
-  priceOverlay: {
-    position: 'absolute',
-    left: 12,
-    top: 12,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  priceOverlayText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#09090b',
   },
   eventCardDetails: {
     padding: 16,
@@ -1289,7 +1274,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#09090b',
+    color: colors.ink,
   },
   cardMetaRow: {
     flexDirection: 'row',
@@ -1299,18 +1284,7 @@ const styles = StyleSheet.create({
   },
   cardMetaText: {
     fontSize: 14,
-    color: '#52525b',
-  },
-  cardPriceBox: {
-    backgroundColor: '#f4f4f5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  cardPriceText: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#09090b',
+    color: colors.muted,
   },
   cardLocationRow: {
     flex: 1,
@@ -1320,17 +1294,17 @@ const styles = StyleSheet.create({
   },
   cardLocationText: {
     fontSize: 14,
-    color: '#52525b',
+    color: colors.muted,
   },
   statusSavedText: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#047857',
+    color: '#438b72',
   },
   statusLeftText: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#e11d48',
+    color: colors.rose,
   },
 
   // Event Detail Screen styling
@@ -1343,30 +1317,30 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 44,
     height: 44,
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: '#e4e4e7',
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   screenHeaderTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#09090b',
+    color: colors.ink,
   },
   eventDetailCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
+    backgroundColor: colors.card,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#e4e4e7',
+    borderColor: colors.border,
     overflow: 'hidden',
     marginBottom: 16,
   },
   eventDetailImageWrapper: {
     width: '100%',
     aspectRatio: 5 / 4,
-    backgroundColor: '#e4e4e7',
+    backgroundColor: colors.blush,
     position: 'relative',
   },
   eventDetailImage: {
@@ -1382,13 +1356,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
-    color: '#e11d48',
+    color: colors.rose,
     letterSpacing: 2,
   },
   detailName: {
     fontSize: 30,
     fontWeight: '900',
-    color: '#09090b',
+    color: colors.ink,
   },
   detailMetaRow: {
     flexDirection: 'row',
@@ -1397,37 +1371,31 @@ const styles = StyleSheet.create({
   },
   detailMetaText: {
     fontSize: 14,
-    color: '#3f3f46',
+    color: colors.ink,
     flex: 1,
     lineHeight: 20,
   },
   detailDescription: {
     fontSize: 14,
     lineHeight: 24,
-    color: '#3f3f46',
+    color: colors.muted,
   },
-  statsGrid: {
+  softNoteBox: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: '#f4f4f5',
-    borderRadius: 8,
+    backgroundColor: '#fff0e8',
+    borderRadius: 18,
     padding: 12,
+    borderWidth: 1,
+    borderColor: '#ffd5c7',
   },
-  statLabel: {
-    fontSize: 12,
+  softNoteText: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    color: '#71717a',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#09090b',
-    marginTop: 4,
   },
   setupHeader: {
     marginBottom: 24,
@@ -1438,26 +1406,26 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 2,
-    color: '#e11d48',
+    color: colors.rose,
     marginBottom: 8,
   },
   setupTitle: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#09090b',
-    letterSpacing: -0.5,
+    color: colors.ink,
+    letterSpacing: 0,
     marginBottom: 8,
   },
   setupSubtitle: {
     fontSize: 14,
-    color: '#71717a',
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 16,
   },
   disabledInput: {
-    backgroundColor: '#f4f4f5',
-    color: '#71717a',
+    backgroundColor: '#fff2ea',
+    color: colors.muted,
   },
   avatarPlaceholder: {
     alignItems: 'center',
@@ -1466,13 +1434,13 @@ const styles = StyleSheet.create({
   },
   avatarPlaceholderText: {
     fontSize: 11,
-    color: '#71717a',
+    color: colors.muted,
     fontWeight: '700',
   },
   blackButton: {
     height: 56,
-    backgroundColor: '#09090b',
-    borderRadius: 8,
+    backgroundColor: colors.honey,
+    borderRadius: 18,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1487,7 +1455,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   blackButtonText: {
-    color: '#ffffff',
+    color: colors.ink,
     fontWeight: '900',
     fontSize: 16,
   },
@@ -1499,10 +1467,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   ticketCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
+    backgroundColor: colors.card,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#e4e4e7',
+    borderColor: colors.border,
     padding: 16,
     gap: 16,
   },
@@ -1514,10 +1482,10 @@ const styles = StyleSheet.create({
   ticketQrContainer: {
     width: 96,
     height: 96,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: '#e4e4e7',
-    borderRadius: 8,
+    borderColor: colors.border,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1527,33 +1495,33 @@ const styles = StyleSheet.create({
   ticketNameText: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#09090b',
+    color: colors.ink,
   },
   ticketDetailText: {
     fontSize: 14,
-    color: '#52525b',
+    color: colors.muted,
     marginTop: 4,
   },
   ticketCodeBox: {
-    backgroundColor: '#f4f4f5',
+    backgroundColor: '#fff2ea',
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 6,
+    borderRadius: 14,
   },
   ticketCodeText: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 14,
     fontWeight: '900',
-    color: '#09090b',
+    color: colors.ink,
   },
 
   // Profile styling
   profileBoxCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
+    backgroundColor: colors.card,
+    borderRadius: 22,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e4e4e7',
+    borderColor: colors.border,
     gap: 16,
   },
   profileAvatarRow: {
@@ -1564,8 +1532,8 @@ const styles = StyleSheet.create({
   avatarPickerButton: {
     width: 80,
     height: 80,
-    borderRadius: 8,
-    backgroundColor: '#f4f4f5',
+    borderRadius: 22,
+    backgroundColor: '#fff2ea',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -1581,19 +1549,19 @@ const styles = StyleSheet.create({
   avatarNameText: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#09090b',
+    color: colors.ink,
   },
   avatarSubText: {
     fontSize: 14,
-    color: '#52525b',
+    color: colors.muted,
     marginTop: 4,
   },
   secondaryActionButton: {
     minHeight: 44,
     borderWidth: 1,
-    borderColor: '#e4e4e7',
-    borderRadius: 8,
-    backgroundColor: '#fafafa',
+    borderColor: colors.border,
+    borderRadius: 16,
+    backgroundColor: '#fff2ea',
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1601,7 +1569,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   secondaryActionText: {
-    color: '#09090b',
+    color: colors.ink,
     fontSize: 14,
     fontWeight: '800',
   },
@@ -1611,17 +1579,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#09090b',
+    color: colors.ink,
   },
   formInput: {
     height: 48,
     borderWidth: 1,
-    borderColor: '#e4e4e7',
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
+    borderColor: colors.border,
+    borderRadius: 16,
+    backgroundColor: colors.card,
     paddingHorizontal: 12,
     fontSize: 15,
-    color: '#09090b',
+    color: colors.ink,
   },
   textAreaInput: {
     height: 96,
@@ -1631,15 +1599,15 @@ const styles = StyleSheet.create({
   signOutBtn: {
     height: 48,
     borderWidth: 1,
-    borderColor: '#d4d4d8',
+    borderColor: colors.border,
     backgroundColor: 'transparent',
-    borderRadius: 8,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 16,
   },
   signOutBtnText: {
-    color: '#3f3f46',
+    color: colors.ink,
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1650,9 +1618,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(255, 253, 248, 0.96)',
     borderTopWidth: 1,
-    borderTopColor: '#e4e4e7',
+    borderTopColor: colors.border,
     paddingBottom: Platform.OS === 'ios' ? 24 : 12,
     paddingTop: 8,
     paddingHorizontal: 12,
@@ -1664,13 +1632,13 @@ const styles = StyleSheet.create({
   navBtn: {
     flex: 1,
     height: 56,
-    borderRadius: 8,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 2,
   },
   navBtnSelected: {
-    backgroundColor: '#09090b',
+    backgroundColor: colors.rose,
   },
   navBtnUnselected: {
     backgroundColor: 'transparent',
@@ -1683,7 +1651,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   navLabelUnselected: {
-    color: '#71717a',
+    color: colors.muted,
   },
 
   // Loader and Error components
@@ -1692,17 +1660,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
+    backgroundColor: colors.card,
+    borderRadius: 18,
     padding: 16,
     marginVertical: 12,
     borderWidth: 1,
-    borderColor: '#e4e4e7',
+    borderColor: colors.border,
   },
   loaderStateText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#71717a',
+    color: colors.muted,
   },
   errorStateCard: {
     backgroundColor: '#fff1f2',
